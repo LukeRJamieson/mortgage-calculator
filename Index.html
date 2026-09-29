@@ -1,0 +1,2359 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Weekly, fortnightly and monthly home loan repayments with offset, Homebuyer Fund buy-back, rental and budget planning.">
+<title>Offset Mortgage Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Base reset (what the Claude artifact host provided) */
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; font: 14px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+
+/* Layout: two-column workbench. Loan inputs pinned on the left, results stack on the right; one column on phones. */
+:root {
+  --bg: #f2f5f6;
+  --surface: #ffffff;
+  --ink: #14202a;
+  --muted: #5a6975;
+  --line: #d9e1e5;
+  --accent: #0d6870;
+  --accent-ink: #ffffff;
+  --accent-soft: #dfeeee;
+  --good: #2a7a3d;
+  --good-soft: #e2f1e5;
+  --grid: #e7ecef;
+  --offset: #9a6400;
+  --fund: #7b4bb5;
+  --warn: #a8481c;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151a; --surface: #152027; --ink: #e5ecf0; --muted: #93a4af; --line: #263540;
+    --accent: #52b9c1; --accent-ink: #06201f; --accent-soft: #15343a;
+    --good: #72c485; --good-soft: #17301f; --grid: #1d2a32; --fund: #b996ea; --offset: #e0a53f; --warn: #f0976b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151a; --surface: #152027; --ink: #e5ecf0; --muted: #93a4af; --line: #263540;
+  --accent: #52b9c1; --accent-ink: #06201f; --accent-soft: #15343a;
+  --good: #72c485; --good-soft: #17301f; --grid: #1d2a32; --fund: #b996ea; --offset: #e0a53f; --warn: #f0976b;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 28px 56px;
+}
+@media (min-width: 700px) { .wrap { padding-inline: 28px; } }
+
+header { display: grid; gap: 6px; margin-bottom: 24px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.7rem, 4vw, 2.3rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+}
+header p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.15rem;
+  margin: 0;
+  text-wrap: balance;
+}
+.label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.layout > *, .panel > *, .section > *, .inputs > * { min-width: 0; }
+@media (min-width: 880px) {
+  .layout { grid-template-columns: 330px minmax(0, 1fr); gap: 28px; }
+  .inputs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); max-height: calc(100vh - 32px); overflow-y: auto; }
+}
+
+/* ---------- Inputs panel ---------- */
+.inputs {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: grid;
+  gap: 18px;
+}
+.inputs-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.example-chip {
+  font-size: 0.75rem;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.field { display: grid; gap: 6px; }
+.field label { cursor: pointer; }
+.control {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.control:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.control input {
+  flex: 1;
+  width: 100%;      /* override the input's default ~20-character width so it can shrink */
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 500 1.05rem/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  padding: 11px 12px;
+}
+.affix { flex: none; white-space: nowrap; font-family: var(--font-mono); color: var(--muted); padding-inline: 12px; }
+.control { min-width: 0; }
+.control select {
+  flex: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--muted);
+  font: 400 0.95rem var(--font-mono);
+  padding: 11px 8px 11px 4px;
+  cursor: pointer;
+}
+.control select:focus-visible { color: var(--ink); }
+.control select.full { flex: 1; width: 100%; min-width: 0; color: var(--ink); font: 500 1.05rem/1.2 var(--font-mono); padding: 11px 12px; }
+.hint.warn { color: var(--warn); }
+.verdict { margin: 0; max-width: 70ch; }
+.verdict strong { font-weight: 600; }
+.opt-budget { max-width: 320px; }
+.opt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.btn {
+  font: 600 0.92rem var(--font-body);
+  color: var(--accent-ink);
+  background: var(--accent);
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.affix.pre { padding-right: 0; }
+.term-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.hint { font-size: 0.8rem; color: var(--muted); margin: 0; }
+.error { font-size: 0.85rem; color: #b3261e; margin: 0; }
+:root[data-theme="dark"] .error { color: #ff9b91; }
+
+/* Segmented control for repayment method */
+.segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+}
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented label {
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 7px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--muted);
+}
+.segmented input:checked + label { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.12); }
+.segmented input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- Results ---------- */
+.results { display: grid; gap: 20px; min-width: 0; }
+.section { display: grid; gap: 12px; min-width: 0; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+
+.freq-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.freq-card {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.freq-card:hover { border-color: var(--accent); }
+.freq-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.freq-card[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--accent-soft); }
+.freq-card .amount { font-family: var(--font-mono); font-weight: 500; font-size: clamp(1.3rem, 2.6vw, 1.7rem); line-height: 1.15; }
+.freq-card .per { font-size: 0.82rem; color: var(--muted); }
+.freq-card > * { min-width: 0; }
+@media (max-width: 560px) {
+  .freq-cards { grid-template-columns: 1fr; gap: 8px; }
+  .freq-card { grid-template-columns: 1fr auto; align-items: center; padding: 12px 14px; }
+  .freq-card .amount { grid-row: 1 / span 2; grid-column: 2; text-align: right; }
+}
+.method-note { font-size: 0.85rem; color: var(--muted); margin: 0; max-width: 70ch; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.compare { display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr) minmax(0, 1fr); column-gap: 12px; }
+.compare > div { min-width: 0; overflow-wrap: anywhere; }
+.compare > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.compare > div:nth-last-child(-n+3) { border-bottom: 0; }
+.compare .col-head { padding-top: 0; }
+.compare .row-head { padding-right: 16px; color: var(--muted); font-size: 0.9rem; }
+.compare .val { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.02rem; }
+.compare .val.with { color: var(--accent); font-weight: 500; }
+.compare .col-head.val { font-family: var(--font-body); }
+
+.savings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  background: var(--good-soft);
+  color: var(--good);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-weight: 500;
+}
+.savings strong { font-family: var(--font-mono); font-weight: 500; }
+.muted-box { background: var(--bg); color: var(--muted); border-radius: 8px; padding: 12px 14px; font-size: 0.9rem; }
+
+/* Chart */
+.chart-readout { font-size: 0.85rem; color: var(--muted); min-height: 1.5em; display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.key { display: inline-flex; align-items: center; gap: 6px; }
+.swatch { width: 18px; height: 0; border-top: 2.5px solid var(--accent); display: inline-block; }
+.swatch.base { border-top: 2px dashed var(--muted); }
+#chart { width: 100%; touch-action: pan-y; }
+#chart svg { display: block; width: 100%; height: auto; }
+.ax { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.line-base { fill: none; stroke: var(--muted); stroke-width: 1.75; stroke-dasharray: 5 4; }
+.line-off { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; }
+.area-off { fill: var(--accent-soft); }
+.cursor { stroke: var(--ink); stroke-width: 1; opacity: .35; }
+.dot-off { fill: var(--accent); }
+.dot-base { fill: var(--muted); }
+.line-offset { fill: none; stroke: var(--offset); stroke-width: 2; stroke-dasharray: 1.5 4; stroke-linecap: round; }
+.dot-offset { fill: var(--offset); }
+.line-fund { fill: none; stroke: var(--fund); stroke-width: 2.25; stroke-linejoin: round; }
+.dot-fund { fill: var(--fund); }
+.swatch.fund { border-top: 2.5px solid var(--fund); }
+.swatch.offset { border-top: 2.5px dotted var(--offset); }
+.end-date { display: grid; gap: 2px; }
+.end-date .big { font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 500; line-height: 1.1; color: var(--accent); }
+.end-date .per { color: var(--muted); font-size: 0.9rem; }
+.crossover { display: flex; gap: 10px; align-items: baseline; margin: 0; font-size: 0.92rem; }
+.crossover .swatch { flex: none; }
+.crossover strong { font-family: var(--font-mono); font-weight: 500; }
+
+/* Table */
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 0; }
+th:last-child, td:last-child { padding-right: 0; }
+th { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+td.num { font-family: var(--font-mono); }
+tr.selected td { color: var(--accent); font-weight: 500; }
+tbody tr:last-child td { border-bottom: 0; }
+
+.footnote { font-size: 0.8rem; color: var(--muted); max-width: 75ch; margin: 0; }
+
+
+/* Homebuyer Fund income-threshold box */
+.income-box { display: grid; gap: 12px; background: var(--bg); border-radius: 8px; padding: 14px; }
+.income-box .control { background: var(--surface); }
+.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 500; cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); flex: none; }
+.forced { border-left: 3px solid var(--warn); padding: 4px 0 4px 12px; display: grid; gap: 4px; }
+.forced .big { color: var(--warn); }
+/* Save / load */
+.saves { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; max-width: 640px; margin-top: 6px; }
+.saves summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.saves summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.saves-body { display: grid; gap: 10px; margin-top: 12px; }
+.save-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+@media (min-width: 480px) { .save-row { grid-template-columns: minmax(0, 1fr) auto; } }
+.save-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.save-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 10px; background: var(--bg); border-radius: 8px; }
+.save-list .name { font-weight: 500; flex: 1 1 140px; min-width: 0; overflow-wrap: anywhere; }
+.save-list .when { font-size: 0.8rem; color: var(--muted); }
+.file-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-ghost {
+  font: 500 0.88rem var(--font-body); color: var(--accent); background: transparent;
+  border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--accent); }
+.btn-ghost:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-ghost.danger { color: var(--warn); }
+.btn:disabled, .btn-ghost:disabled { opacity: 0.5; cursor: default; }
+.share-url { width: 100%; font: 0.8rem var(--font-mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+/* Page groups and jump links */
+.group { display: grid; gap: 14px; scroll-margin-top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.group + .group { margin-top: 18px; padding-top: 22px; border-top: 1px solid var(--line); }
+.group-title { font-family: var(--font-display); font-weight: 700; font-size: 1.45rem; margin: 0; letter-spacing: -0.01em; }
+.jump { display: flex; flex-wrap: wrap; gap: 8px; }
+.jump a {
+  font-size: 0.85rem; font-weight: 500; text-decoration: none; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px;
+}
+.jump a:hover { border-color: var(--accent); color: var(--accent); }
+.jump a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Budget panel */
+.budget-table td:first-child { white-space: normal; }
+.budget-table th { white-space: normal; }
+.budget-table tr.total td { font-weight: 600; border-top: 2px solid var(--line); }
+.budget-table tr.plus td.num { color: var(--good); }
+/* Rental panel */
+.rent-fields { display: grid; gap: 14px; }
+.pl-table td:first-child { white-space: normal; }
+.pl-table tr.total td { font-weight: 600; border-top: 2px solid var(--line); }
+.pl-table tr.sub td { color: var(--muted); }
+/* History + valuation panels */
+h3 { font-family: var(--font-display); font-weight: 600; font-size: 1rem; margin: 6px 0 0; }
+.seg-inline { max-width: 480px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.val-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; }
+.val-grid > * { min-width: 0; }
+details.changes summary { cursor: pointer; font-weight: 500; color: var(--accent); }
+details.changes summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.changes[open] summary { margin-bottom: 8px; }
+.line-cash { fill: none; stroke: var(--muted); stroke-width: 1.75; stroke-dasharray: 5 4; }
+.line-rate { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.range-bar { position: relative; height: 34px; margin: 4px 0 2px; }
+.range-bar .track { position: absolute; left: 0; right: 0; top: 16px; height: 2px; background: var(--line); }
+.range-bar .tick { position: absolute; top: 9px; width: 2px; height: 16px; background: var(--accent); border-radius: 1px; }
+.range-bar .tick.you { background: var(--offset); height: 22px; top: 6px; width: 3px; }
+td.stack { white-space: normal; }
+td .sub, td.stack .sub { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+td.wrap { white-space: normal; font-size: 0.85rem; }
+td.pos { color: var(--good); }
+td.neg { color: var(--warn); }
+.lvr-high { color: var(--warn); font-weight: 500; }
+a { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Offset Mortgage Calculator</h1>
+    <p>Enter your loan details to see weekly, fortnightly and monthly repayments, and how much interest and time your offset account saves.</p>
+    <details class="saves" id="saves">
+      <summary>Save, share or load your figures</summary>
+      <div class="saves-body">
+        <div class="save-row">
+          <div class="control"><input id="save-name" placeholder="Name, e.g. Current plan" aria-label="Scenario name" maxlength="60"></div>
+          <button type="button" class="btn" id="save-btn">Save in this browser</button>
+        </div>
+        <p class="hint" id="save-status" aria-live="polite"></p>
+        <ul class="save-list" id="save-list"></ul>
+        <div class="file-row">
+          <button type="button" class="btn-ghost" id="share-btn">Copy share link</button>
+          <button type="button" class="btn-ghost" id="file-save">Download data file</button>
+          <label class="btn-ghost" for="file-open" tabindex="0" id="file-open-label">Open data file</label>
+          <input type="file" id="file-open" accept=".json,application/json" hidden>
+        </div>
+        <input id="share-url" class="share-url" readonly hidden aria-label="Share link">
+        <p class="hint">Saved scenarios stay in this browser only. A share link carries your figures inside the link, so anyone you send it to sees them; the figures after the # are never sent to the web server. A data file stays with you until you send it.</p>
+      </div>
+    </details>
+  </header>
+
+  <div class="layout">
+    <!-- ================= Inputs ================= -->
+    <form class="inputs" id="loan-form" autocomplete="off" novalidate>
+      <div class="inputs-head">
+        <h2>Your loan</h2>
+        <span class="example-chip" id="example-chip">Example figures</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="balance">Loan balance</label>
+        <div class="control"><span class="affix pre">$</span><input id="balance" inputmode="decimal" value="600,000"></div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="rate">Interest rate (p.a.)</label>
+        <div class="control"><input id="rate" inputmode="decimal" value="6.04"><span class="affix">%</span></div>
+      </div>
+
+      <div class="field">
+        <span class="label" id="start-label">Loan start date</span>
+        <div class="term-row" role="group" aria-labelledby="start-label">
+          <div class="control">
+            <select id="startmonth" class="full" aria-label="Start month">
+              <option value="0">Jan</option>
+              <option value="1">Feb</option>
+              <option value="2">Mar</option>
+              <option value="3">Apr</option>
+              <option value="4">May</option>
+              <option value="5">Jun</option>
+              <option value="6">Jul</option>
+              <option value="7">Aug</option>
+              <option value="8" selected>Sep</option>
+              <option value="9">Oct</option>
+              <option value="10">Nov</option>
+              <option value="11">Dec</option>
+            </select>
+          </div>
+          <div class="control"><input id="startyear" inputmode="numeric" value="2021" aria-label="Start year"></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="term">Loan term</label>
+        <div class="control"><input id="term" inputmode="numeric" value="30"><span class="affix">yrs</span></div>
+        <p class="hint" id="term-hint"></p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="offset">Offset account balance</label>
+        <div class="control"><span class="affix pre">$</span><input id="offset" inputmode="decimal" value="40,000"></div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="offsetpct">Offset linkage</label>
+        <div class="control"><input id="offsetpct" inputmode="decimal" value="100"><span class="affix">%</span></div>
+        <p class="hint">How much of the offset reduces interest. Most offsets are 100%.</p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="growth-label">Offset growth a month</span>
+        <div class="term-row" role="group" aria-labelledby="growth-label">
+          <div class="field">
+            <label class="hint" for="growth">From you</label>
+            <div class="control"><span class="affix pre">$</span><input id="growth" inputmode="decimal" value="500"></div>
+          </div>
+          <div class="field">
+            <label class="hint" for="partner">From partner</label>
+            <div class="control"><span class="affix pre">$</span><input id="partner" inputmode="decimal" placeholder="0"></div>
+          </div>
+        </div>
+        <p class="hint" id="growth-hint">What goes into the offset each month after spending. Use 0 for a steady balance.</p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="nominated">Your repayment</label>
+        <div class="control">
+          <span class="affix pre">$</span>
+          <input id="nominated" inputmode="decimal" value="2,000" placeholder="Minimum">
+          <select id="nomfreq" aria-label="Repayment frequency">
+            <option value="weekly">/ week</option>
+            <option value="fortnightly" selected>/ fortnight</option>
+            <option value="monthly">/ month</option>
+          </select>
+        </div>
+        <p class="hint" id="nom-hint"></p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="method-label">Weekly &amp; fortnightly method</span>
+        <div class="segmented" role="radiogroup" aria-labelledby="method-label">
+          <input type="radio" name="method" id="method-calc" value="calculated" checked>
+          <label for="method-calc">Bank minimum</label>
+          <input type="radio" name="method" id="method-split" value="split">
+          <label for="method-split">Split monthly</label>
+        </div>
+      </div>
+
+      <p class="error" id="error" hidden></p>
+    </form>
+
+    <!-- ================= Results ================= -->
+    <div class="results">
+
+      <nav class="jump" aria-label="Sections">
+        <a href="#go-repayments">Repayments</a>
+        <a href="#go-plan">Your plan</a>
+        <a href="#go-budget">Budget</a>
+        <a href="#go-property">Property</a>
+        <a href="#go-rates">Rate history</a>
+      </nav>
+
+      <div class="group" id="go-repayments">
+        <h2 class="group-title">Repayments</h2>
+      <section class="section" aria-labelledby="repay-h">
+        <div class="section-head">
+          <h2 id="repay-h">Minimum repayments</h2>
+          <span class="label">Tap to pay this often</span>
+        </div>
+        <div class="freq-cards" id="freq-cards"></div>
+        <p class="method-note" id="method-note"></p>
+      </section>
+      <section class="panel" aria-labelledby="table-h">
+        <h2 id="table-h">Compare frequencies</h2>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>Frequency</th><th>Repayment</th><th>Total interest</th><th>Debt-free</th><th>Takes</th></tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </section>
+      </div>
+
+      <div class="group" id="go-plan">
+        <h2 class="group-title">Your plan</h2>
+      <section class="panel" aria-labelledby="offset-h">
+        <h2 id="offset-h">Debt-free date</h2>
+        <div id="plan-body"></div>
+      </section>
+      <section class="panel" aria-labelledby="chart-h">
+        <div class="section-head">
+          <h2 id="chart-h">Balance over time</h2>
+          <span class="label" id="chart-freq"></span>
+        </div>
+        <div class="chart-readout" id="chart-readout" aria-live="polite"></div>
+        <div id="chart"></div>
+      </section>
+      </div>
+
+      <div class="group" id="go-budget">
+        <h2 class="group-title">Budget</h2>
+      <section class="panel" aria-labelledby="budget-h">
+        <div class="section-head">
+          <h2 id="budget-h">Monthly budget</h2>
+        </div>
+        <div class="val-grid">
+          <div class="field">
+            <label class="label" for="bud-pay">Monthly take-home pay</label>
+            <div class="control"><span class="affix pre">$</span><input id="bud-pay" class="ext-input" inputmode="decimal" placeholder="After tax"><span class="affix">/ month</span></div>
+          </div>
+          <div class="field">
+            <label class="label" for="bud-living">Other living costs</label>
+            <div class="control"><span class="affix pre">$</span><input id="bud-living" class="ext-input" inputmode="decimal" placeholder="0"><span class="affix">/ month</span></div>
+            <p class="hint">Food, bills, transport, subscriptions and so on.</p>
+          </div>
+        </div>
+        <div id="budget-body"></div>
+      </section>
+      <section class="panel" aria-labelledby="opt-h">
+        <div class="section-head">
+          <h2 id="opt-h">Offset or repayments?</h2>
+          <span class="label" id="opt-freq"></span>
+        </div>
+        <p class="method-note">Enter the total you can put toward the loan each month. This tests every split between repayments and offset savings to find the fastest way to be debt-free.</p>
+        <div class="field opt-budget">
+          <label class="label" for="budget">Monthly budget</label>
+          <div class="control"><span class="affix pre">$</span><input id="budget" inputmode="decimal"><span class="affix">/ month</span></div>
+          <p class="hint" id="budget-hint"></p>
+        </div>
+        <div id="opt-body"></div>
+      </section>
+      </div>
+
+      <div class="group" id="go-property">
+        <h2 class="group-title">Property</h2>
+      <section class="panel" aria-labelledby="prop-h">
+        <div class="section-head">
+          <h2 id="prop-h">Property value</h2>
+          <span class="label" id="prop-suburb"></span>
+        </div>
+        <div class="segmented seg-inline" role="radiogroup" aria-label="Dwelling type">
+          <input type="radio" name="dtype" id="dtype-unit2" value="unit2" class="ext-input" checked>
+          <label for="dtype-unit2">2-bed units</label>
+          <input type="radio" name="dtype" id="dtype-unit" value="unit" class="ext-input">
+          <label for="dtype-unit">All units</label>
+          <input type="radio" name="dtype" id="dtype-house" value="house" class="ext-input">
+          <label for="dtype-house">House</label>
+        </div>
+        <div id="market-body"></div>
+
+        <h3>Your valuations</h3>
+        <p class="method-note">Council valuations are set for each property by the Valuer-General. Use the Capital Improved Value on your rates notice. Leave any you don't have blank.</p>
+        <div class="val-grid">
+          <div class="field">
+            <label class="label" for="v-purchase">Purchase price</label>
+            <div class="control"><span class="affix pre">$</span><input id="v-purchase" class="ext-input" inputmode="decimal"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="v-council">Council valuation (CIV)</label>
+            <div class="control"><span class="affix pre">$</span><input id="v-council" class="ext-input" inputmode="decimal"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="v-bank">Bank valuation</label>
+            <div class="control"><span class="affix pre">$</span><input id="v-bank" class="ext-input" inputmode="decimal"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="v-agent">Agent appraisal</label>
+            <div class="control"><span class="affix pre">$</span><input id="v-agent" class="ext-input" inputmode="decimal"></div>
+          </div>
+        </div>
+        <div id="equity-body"></div>
+        <p class="footnote" id="market-sources"></p>
+      </section>
+      <section class="panel" aria-labelledby="costs-h">
+        <div class="section-head">
+          <h2 id="costs-h">Property costs</h2>
+          <span class="label">Yearly</span>
+        </div>
+      <p class="method-note">Paid whether you live there or rent it out. Used by your monthly budget and the rental figures.</p>
+        <div class="val-grid">
+          <div class="field">
+            <label class="label" for="rent-rates">Council rates</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-rates" class="ext-input" inputmode="decimal" value="1,800"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="rent-water">Water service charges</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-water" class="ext-input" inputmode="decimal" value="750"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="rent-oc">Owners corporation</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-oc" class="ext-input" inputmode="decimal" value="1,200"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="rent-ins">Insurance</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-ins" class="ext-input" inputmode="decimal" value="1,500"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="rent-maint">Repairs and maintenance</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-maint" class="ext-input" inputmode="decimal" value="1,000"></div>
+          </div>
+          <div class="field">
+            <label class="label" for="rent-sv">Site value (for land tax)</label>
+            <div class="control"><span class="affix pre">$</span><input id="rent-sv" class="ext-input" inputmode="decimal" value="300,000"></div>
+            <p class="hint">The SV on your rates notice.</p>
+          </div>
+        </div>
+      </section>
+      <section class="panel" aria-labelledby="vhf-h">
+        <div class="section-head">
+          <h2 id="vhf-h">Homebuyer Fund buy-back</h2>
+          <span class="label">Victorian Homebuyer Fund</span>
+        </div>
+        <p class="method-note">The State owns a share of your home and charges no interest, but its share grows with the property's value. This compares buying it back first with clearing the loan first, using your repayment and offset savings from above.</p>
+        <div class="val-grid">
+          <div class="field">
+            <label class="label" for="vhf-share">Fund's share</label>
+            <div class="control"><input id="vhf-share" class="ext-input" inputmode="decimal" value="25"><span class="affix">%</span></div>
+          </div>
+          <div class="field">
+            <label class="label" for="vhf-value">Property value</label>
+            <div class="control"><span class="affix pre">$</span><input id="vhf-value" class="ext-input" inputmode="decimal"></div>
+            <p class="hint" id="vhf-value-hint"></p>
+          </div>
+          <div class="field">
+            <label class="label" for="vhf-growth">Expected value growth</label>
+            <div class="control"><input id="vhf-growth" class="ext-input" inputmode="decimal" value="3"><span class="affix">% / yr</span></div>
+            <p class="hint">An assumption. Mooroolbark houses averaged about 4.2% a year over 10 years (HTAG); unit figures swing from −2.7% to +8% by source over the last year.</p>
+          </div>
+        </div>
+        <div class="income-box">
+          <label class="check" for="vhf-income"><input type="checkbox" id="vhf-income" class="ext-input" checked> Income over the threshold at two annual reviews in a row</label>
+          <div class="val-grid" id="vhf-income-fields">
+            <div class="field">
+              <span class="label" id="vhf-due-label">Repayment required from</span>
+              <div class="term-row" role="group" aria-labelledby="vhf-due-label">
+                <div class="control">
+                  <select id="vhf-due-month" class="full ext-input" aria-label="Month">
+                <option value="0">Jan</option>
+                <option value="1">Feb</option>
+                <option value="2">Mar</option>
+                <option value="3">Apr</option>
+                <option value="4">May</option>
+                <option value="5">Jun</option>
+                <option value="6">Jul</option>
+                <option value="7">Aug</option>
+                <option value="8" selected>Sep</option>
+                <option value="9">Oct</option>
+                <option value="10">Nov</option>
+                <option value="11">Dec</option>
+                  </select>
+                </div>
+                <div class="control"><input id="vhf-due-year" class="ext-input" inputmode="numeric" value="2028" aria-label="Year"></div>
+              </div>
+              <p class="hint">The date of the second review you're over the threshold.</p>
+            </div>
+            <div class="field">
+              <label class="label" for="vhf-lvr">Max loan-to-value when refinancing</label>
+              <div class="control"><input id="vhf-lvr" class="ext-input" inputmode="decimal" value="80"><span class="affix">%</span></div>
+              <p class="hint">Borrowing above 80% usually means mortgage insurance.</p>
+            </div>
+          </div>
+          <label class="check" for="vhf-useoffset"><input type="checkbox" id="vhf-useoffset" class="ext-input" checked> Use offset savings first</label>
+        </div>
+        <div id="vhf-body"></div>
+      </section>
+      <section class="panel" aria-labelledby="rent-h">
+        <div class="section-head">
+          <h2 id="rent-h">Rental income</h2>
+          <span class="example-chip" id="rent-chip">Example costs</span>
+        </div>
+        <label class="check" for="rent-on"><input type="checkbox" id="rent-on" class="ext-input" checked> I plan to rent it out</label>
+        <div id="rent-fields" class="rent-fields">
+          <div class="val-grid">
+            <div class="field">
+              <span class="label" id="rent-start-label">Start renting</span>
+              <div class="term-row" role="group" aria-labelledby="rent-start-label">
+                <div class="control">
+                  <select id="rent-month" class="full ext-input" aria-label="Month">
+                <option value="0">Jan</option>
+                <option value="1" selected>Feb</option>
+                <option value="2">Mar</option>
+                <option value="3">Apr</option>
+                <option value="4">May</option>
+                <option value="5">Jun</option>
+                <option value="6">Jul</option>
+                <option value="7">Aug</option>
+                <option value="8">Sep</option>
+                <option value="9">Oct</option>
+                <option value="10">Nov</option>
+                <option value="11">Dec</option>
+                  </select>
+                </div>
+                <div class="control"><input id="rent-year" class="ext-input" inputmode="numeric" value="2027" aria-label="Year"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-weekly">Weekly rent</label>
+              <div class="control"><span class="affix pre">$</span><input id="rent-weekly" class="ext-input" inputmode="decimal" value="560"><span class="affix">/ week</span></div>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-vacancy">Vacant weeks a year</label>
+              <div class="control"><input id="rent-vacancy" class="ext-input" inputmode="decimal" value="2"><span class="affix">weeks</span></div>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-mgmt">Management fee</label>
+              <div class="control"><input id="rent-mgmt" class="ext-input" inputmode="decimal" value="7"><span class="affix">% of rent</span></div>
+              <p class="hint">Melbourne agents typically charge 5–10%.</p>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-letting">Letting fee a year</label>
+              <div class="control"><input id="rent-letting" class="ext-input" inputmode="decimal" value="2"><span class="affix">weeks' rent</span></div>
+              <p class="hint">Usually 1–4 weeks' rent per new tenant.</p>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-own">Your own rent after moving out</label>
+              <div class="control"><span class="affix pre">$</span><input id="rent-own" class="ext-input" inputmode="decimal" placeholder="0"><span class="affix">/ week</span></div>
+              <p class="hint">Shown in the weekly budget only. It doesn't change the projection.</p>
+            </div>
+          </div>
+
+          <h3>Tax</h3>
+          <div class="val-grid">
+            <div class="field">
+              <label class="label" for="rent-taxrate">Your marginal tax rate</label>
+              <div class="control">
+                <select id="rent-taxrate" class="full ext-input">
+                  <option value="0">0% (under $18,200)</option>
+                  <option value="17">15% + 2% Medicare (to $45,000)</option>
+                  <option value="32" selected>30% + 2% Medicare (to $135,000)</option>
+                  <option value="39">37% + 2% Medicare (to $190,000)</option>
+                  <option value="47">45% + 2% Medicare (over $190,000)</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label class="label" for="rent-deprec">Depreciation a year</label>
+              <div class="control"><span class="affix pre">$</span><input id="rent-deprec" class="ext-input" inputmode="decimal" placeholder="0"></div>
+              <p class="hint">From a quantity surveyor's depreciation schedule, if you get one.</p>
+            </div>
+          </div>
+          <label class="check" for="rent-project"><input type="checkbox" id="rent-project" class="ext-input" checked> Add the rental cash flow to my offset in the projection</label>
+        </div>
+        <div id="rent-body"></div>
+      </section>
+      </div>
+
+      <div class="group" id="go-rates">
+        <h2 class="group-title">Rate history</h2>
+      <section class="panel" aria-labelledby="rates-h">
+        <div class="section-head">
+          <h2 id="rates-h">Rate history</h2>
+          <span class="label" id="rates-since"></span>
+        </div>
+        <p class="method-note">Reserve Bank cash rate changes since your loan started. Enter the rate you started on to estimate your rate today, assuming your lender passed every change on in full.</p>
+        <div class="field opt-budget">
+          <label class="label" for="startrate">Starting interest rate</label>
+          <div class="control"><input id="startrate" class="ext-input" inputmode="decimal" placeholder="Rate at loan start"><span class="affix">%</span></div>
+        </div>
+        <div id="rates-body"></div>
+        <div class="chart-readout" id="rates-legend"></div>
+        <div id="rates-chart"></div>
+        <details class="changes">
+          <summary id="rates-summary">RBA changes since you started</summary>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Effective</th><th>Change</th><th>Cash rate</th><th id="rates-your-col">Your rate</th></tr></thead>
+              <tbody id="rates-table"></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+      </div>
+
+
+
+
+
+
+
+
+
+
+      <p class="footnote">
+        Estimates only. Assumes the rate stays fixed for the whole term and interest is charged each repayment period on the loan balance minus the offset.
+        Debt-free means the earlier of the loan reaching $0 or your offset holding enough to pay it out.
+        Offset growth is entered per month and spread evenly across repayments. Your repayment is converted between frequencies at the same yearly total. End dates count from today.
+        Australian lenders usually calculate interest daily and charge it monthly, so your statement can differ by a few dollars.
+        Repayments are rounded up to the cent. Fees, rate changes and redraws are not included.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   Offset Mortgage Calculator
+   All maths is plain amortisation, simulated period by period so the
+   offset account (which reduces interest but not the required repayment)
+   can be modelled exactly.
+   ===================================================================== */
+
+const FREQS = [
+  { key: "weekly",      label: "Weekly",      unit: "week",      ppy: 52 },
+  { key: "fortnightly", label: "Fortnightly", unit: "fortnight", ppy: 26 },
+  { key: "monthly",     label: "Monthly",     unit: "month",     ppy: 12 },
+];
+
+const STORAGE_KEY = "offset-mortgage-v1";
+const $ = (id) => document.getElementById(id);
+
+const fmtCents = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmtDollars = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 });
+const fmtPlain = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 });
+
+let selectedFreq = "fortnightly";
+let lastResults = null;
+
+/* ---------- Parsing helpers ---------- */
+
+// Accepts "600,000", "$600000", "600k" style input; returns a number or NaN.
+function parseMoney(str) {
+  const s = String(str).trim().toLowerCase().replace(/[$,\s]/g, "");
+  if (s === "") return NaN;
+  const mult = s.endsWith("k") ? 1e3 : s.endsWith("m") ? 1e6 : 1;
+  const n = parseFloat(s.replace(/[km]$/, ""));
+  return Number.isFinite(n) ? n * mult : NaN;
+}
+function parseNum(str) {
+  const n = parseFloat(String(str).replace(/[,%\s]/g, ""));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/* ---------- Core maths ---------- */
+
+// Standard annuity repayment: P = B·r / (1 − (1 + r)^−n), rounded UP to the cent (as lenders do).
+function repayment(balance, annualRatePct, termYears, ppy) {
+  const n = Math.round(termYears * ppy);
+  const r = annualRatePct / 100 / ppy;
+  if (n <= 0) return balance;
+  const p = r === 0 ? balance / n : (balance * r) / (1 - Math.pow(1 + r, -n));
+  return Math.ceil(p * 100 - 1e-9) / 100;
+}
+
+// Simulate the loan period by period.
+// Interest each period is charged on (balance − offset × linkage), never below zero.
+// The offset grows by `offsetGrowth` each period (deposits land after that period's interest).
+// Returns periods until the loan balance reaches $0, total interest, balance/offset history,
+// and `coversAt`: the first period the offset holds enough cash to pay the loan out
+// (with `interestAtCover`, the interest paid up to that point).
+// `extra` = { from, per }: from period `from`, add `per` to the offset each period (can be negative).
+function simulate(balance, annualRatePct, ppy, payment, offset, offsetGrowth = 0, linkage = 1, extra = null) {
+  const r = annualRatePct / 100 / ppy;
+  const maxPeriods = ppy * 100;           // safety cap: 100 years
+  let bal = balance, off = offset, totalInterest = 0, k = 0;
+  let coversAt = off >= bal ? 0 : null;
+  let interestAtCover = 0;
+  const history = [balance];
+  const offsetHistory = [offset];
+
+  while (bal > 0.005 && k < maxPeriods) {
+    const interest = Math.max(0, bal - off * linkage) * r;
+    const pay = Math.min(payment, bal + interest);   // final repayment is usually smaller
+    bal = bal + interest - pay;
+    totalInterest += interest;
+    off = Math.max(0, off + offsetGrowth + (extra && k >= extra.from ? extra.per : 0));
+    k++;
+    history.push(Math.max(0, bal));
+    offsetHistory.push(off);
+    if (coversAt === null && bal > 0.005 && off >= bal) { coversAt = k; interestAtCover = totalInterest; }
+  }
+  return { periods: k, interest: totalInterest, history, offsetHistory, coversAt, interestAtCover, paidOff: bal <= 0.005 };
+}
+
+// Debt-free point: the earlier of the loan reaching $0 or the offset being able to pay it out.
+function debtFree(sim) {
+  if (sim.coversAt !== null && sim.coversAt < sim.periods) return { periods: sim.coversAt, interest: sim.interestAtCover, viaOffset: true };
+  return { periods: sim.periods, interest: sim.interest, viaOffset: false };
+}
+
+/* ---------- Formatting helpers ---------- */
+
+function duration(periods, ppy) {
+  const totalMonths = Math.round((periods * 12) / ppy);
+  const y = Math.floor(totalMonths / 12), m = totalMonths % 12;
+  const parts = [];
+  if (y) parts.push(`${y} yr${y === 1 ? "" : "s"}`);
+  if (m || !y) parts.push(`${m} mth${m === 1 ? "" : "s"}`);
+  return parts.join(" ");
+}
+function compactMoney(v) {
+  if (v >= 1e6) return "$" + fmtPlain.format(+(v / 1e6).toFixed(2)) + "M";
+  if (v >= 1e3) return "$" + fmtPlain.format(Math.round(v / 1e3)) + "k";
+  return "$" + Math.round(v);
+}
+
+/* ---------- Read inputs ---------- */
+
+// Blank optional money fields count as $0
+const optMoney = (id) => ($(id).value.trim() === "" ? 0 : parseMoney($(id).value));
+
+// Remaining term = original term minus months elapsed since the start date.
+// A start date in the future counts as starting now.
+function remainingTerm(startMonth, startYear, termYears) {
+  const now = new Date();
+  const elapsed = Math.max(0, (now.getFullYear() - startYear) * 12 + (now.getMonth() - startMonth));
+  const remaining = Math.round(termYears * 12) - elapsed;
+  return { elapsedMonths: elapsed, remainingMonths: remaining, years: Math.floor(remaining / 12), months: remaining % 12 };
+}
+
+// Rental settings (all optional money fields default to $0)
+function readRental() {
+  const now = new Date();
+  const year = parseNum($("rent-year").value), month = parseInt($("rent-month").value, 10);
+  const num = (id, d = 0) => { const v = parseNum($(id).value); return Number.isFinite(v) ? v : d; };
+  return {
+    on: $("rent-on").checked,
+    project: $("rent-project").checked,
+    monthsUntil: Number.isFinite(year) ? Math.max(0, (year - now.getFullYear()) * 12 + (month - now.getMonth())) : 0,
+    startDate: new Date(Number.isFinite(year) ? year : now.getFullYear(), month, 1),
+    rent: optMoney("rent-weekly"),
+    vacancy: Math.min(52, Math.max(0, num("rent-vacancy"))),
+    mgmtPct: num("rent-mgmt"),
+    letWeeks: num("rent-letting"),
+    ownRent: optMoney("rent-own"),
+    rates: optMoney("rent-rates"), water: optMoney("rent-water"), oc: optMoney("rent-oc"),
+    ins: optMoney("rent-ins"), maint: optMoney("rent-maint"),
+    siteValue: optMoney("rent-sv"),
+    taxRate: num("rent-taxrate"),
+    deprec: optMoney("rent-deprec"),
+  };
+}
+
+// Victorian general land tax (individuals), 2024–2033 land tax years, including the COVID debt levy.
+// Source: SRO general rates as published for 2026.
+function vicLandTax(v) {
+  if (v < 50000) return 0;
+  if (v < 100000) return 500;
+  if (v < 300000) return 975;
+  if (v < 600000) return 1350 + 0.003 * (v - 300000);
+  if (v < 1000000) return 2250 + 0.006 * (v - 600000);
+  if (v < 1800000) return 4650 + 0.009 * (v - 1000000);
+  if (v < 3000000) return 11850 + 0.0165 * (v - 1800000);
+  return 31650 + 0.0265 * (v - 3000000);
+}
+
+// First-year rental numbers for one repayment frequency. `sim` is the projection without rent,
+// used to estimate the (deductible) interest charged in the first 12 months of renting.
+function rentalFor(inp, f, sim) {
+  const R = inp.rental;
+  if (!R.on || !(R.rent > 0)) return null;
+  const from = Math.round((R.monthsUntil * f.ppy) / 12);
+  const r = inp.rate / 100 / f.ppy, link = inp.offsetPct / 100;
+  let interest = 0;
+  for (let k = from; k < from + f.ppy && k < sim.history.length - 1; k++) {
+    interest += Math.max(0, sim.history[k] - sim.offsetHistory[k] * link) * r;
+  }
+  const gross = R.rent * Math.max(0, 52 - R.vacancy);
+  const mgmt = (gross * R.mgmtPct) / 100;
+  const letting = R.rent * R.letWeeks;
+  const running = R.rates + R.water + R.oc + R.ins + R.maint;
+  const landTax = vicLandTax(R.siteValue);
+  const profit = gross - mgmt - letting - running - landTax - interest;   // before tax and depreciation
+  const taxable = profit - R.deprec;
+  const tax = (-taxable * R.taxRate) / 100;                              // + refund, − tax payable
+  // Extra cash each year that goes to the offset. Rates, water, owners corp, insurance and
+  // maintenance already come out of your budget today, so only the new items count here.
+  // Your own rent elsewhere is left out: your offset growth figure already covers living costs.
+  const extraCash = gross - mgmt - letting - landTax + tax;
+  return { from, interest, gross, mgmt, letting, running, landTax, profit, taxable, tax, extraCash, per: extraCash / f.ppy };
+}
+
+function readInputs() {
+  return {
+    balance: parseMoney($("balance").value),
+    rate: parseNum($("rate").value),
+    startMonth: parseInt($("startmonth").value, 10),   // 0 = Jan
+    startYear: parseNum($("startyear").value),
+    term: parseNum($("term").value),                  // original loan term in years
+    ...remainingTerm(parseInt($("startmonth").value, 10), parseNum($("startyear").value), parseNum($("term").value)),
+    offset: optMoney("offset"),
+    offsetPct: $("offsetpct").value.trim() === "" ? 100 : parseNum($("offsetpct").value),   // offset linkage %
+    budget: optMoney("budget"),         // optimiser: total monthly budget (0 = use current plan)
+    growthOwn: optMoney("growth"),                          // your monthly offset savings
+    partner: optMoney("partner"),                           // partner's monthly offset savings
+    growth: optMoney("growth") + optMoney("partner"),       // total $ added to the offset per month
+    nominated: optMoney("nominated"),   // what you choose to pay (0 = minimum)
+    nomFreq: $("nomfreq").value,        // how often you pay it
+    method: document.querySelector('input[name="method"]:checked').value,
+    rental: readRental(),
+  };
+}
+
+function validate(inp) {
+  if (!(inp.balance > 0)) return "Enter a loan balance greater than $0.";
+  if (!(inp.rate >= 0) || inp.rate > 30) return "Enter an interest rate between 0% and 30%.";
+  if (!(inp.startYear >= 1970 && inp.startYear <= 2100) || inp.startYear % 1 !== 0) return "Enter the loan start year, for example 2021.";
+  if (!(inp.term > 0) || inp.term > 50) return "Enter a loan term between 1 and 50 years.";
+  if (!(inp.remainingMonths > 0)) return "With that start date and term the loan would already be finished. Check the start date and loan term.";
+  if (!(inp.offset >= 0)) return "Enter an offset balance of $0 or more.";
+  if (!(inp.offsetPct >= 0 && inp.offsetPct <= 100)) return "Enter an offset linkage between 0% and 100%.";
+  if (!(inp.budget >= 0)) return "Enter a monthly budget of $0 or more, or leave it blank.";
+  if (!(inp.partner >= 0)) return "Enter a partner contribution of $0 or more per month.";
+  if (!(inp.growth >= 0)) return "Enter an offset growth of $0 or more per month.";
+  if (!(inp.nominated >= 0)) return "Enter a repayment of $0 or more, or leave it blank to pay the minimum.";
+  return null;
+}
+
+/* ---------- Dates ---------- */
+
+const TODAY = new Date();
+TODAY.setHours(0, 0, 0, 0);
+
+// Date after `periods` repayments at `ppy` per year, counted from today.
+function dateAfter(periods, ppy) {
+  const d = new Date(TODAY);
+  if (ppy === 12) d.setMonth(d.getMonth() + periods);
+  else d.setDate(d.getDate() + periods * (364 / ppy));   // 7 days per week, 14 per fortnight
+  return d;
+}
+const fmtMonthYear = (d) => d.toLocaleDateString("en-AU", { month: "short", year: "numeric" });
+
+/* ---------- Main calculation ---------- */
+
+function calculate(inp) {
+  const termYears = inp.years + inp.months / 12;
+  const monthly = repayment(inp.balance, inp.rate, termYears, 12);
+
+  return FREQS.map((f) => {
+    let pay;
+    if (inp.method === "split" && f.key !== "monthly") {
+      // "Split monthly": half the monthly repayment each fortnight, a quarter each week.
+      // That's 13 months of repayments a year, so the loan finishes early.
+      pay = Math.ceil((monthly / (f.ppy / 13)) * 100 - 1e-9) / 100;
+    } else {
+      pay = f.key === "monthly" ? monthly : repayment(inp.balance, inp.rate, termYears, f.ppy);
+    }
+    // Your repayment, converted to this frequency at the same yearly total
+    // (e.g. $500/week → $2,166.67/month). Never below the bank minimum.
+    const nomPpy = FREQS.find((x) => x.key === inp.nomFreq).ppy;
+    const chosen = inp.nominated > 0 ? Math.round(((inp.nominated * nomPpy) / f.ppy) * 100) / 100 : pay;
+    const belowMin = inp.nominated > 0 && chosen < pay;
+    const total = Math.max(chosen, pay);
+    const growthPer = (inp.growth * 12) / f.ppy;   // monthly offset growth spread per repayment
+
+    // Baseline: minimum repayments only (no offset). Plan: everything you entered.
+    const base = simulate(inp.balance, inp.rate, f.ppy, pay, 0, 0);
+    const planNoRent = simulate(inp.balance, inp.rate, f.ppy, total, inp.offset, growthPer, inp.offsetPct / 100);
+    const rental = rentalFor(inp, f, planNoRent);
+    const plan = rental && inp.rental.project
+      ? simulate(inp.balance, inp.rate, f.ppy, total, inp.offset, growthPer, inp.offsetPct / 100, { from: rental.from, per: rental.per })
+      : planNoRent;
+    return { ...f, pay, total, belowMin, perYear: total * f.ppy, base, plan, planNoRent, rental };
+  });
+}
+
+// True when the plan differs from repayments alone
+const hasPlan = (inp) => inp.offset > 0 || inp.growth > 0 || inp.nominated > 0;
+
+/* ---------- Rendering ---------- */
+
+function renderCards(inp, results) {
+  $("freq-cards").innerHTML = results.map((r) => `
+    <button type="button" class="freq-card" data-freq="${r.key}" aria-pressed="${r.key === selectedFreq}">
+      <span class="label">${r.label}</span>
+      <span class="amount">${fmtCents.format(r.pay)}</span>
+      <span class="per num">${fmtDollars.format(r.pay * r.ppy)} a year</span>
+    </button>`).join("");
+}
+
+function renderNomHint(inp, r) {
+  const hint = $("nom-hint");
+  hint.classList.toggle("warn", r.belowMin);
+  if (!(inp.nominated > 0)) {
+    hint.textContent = `Blank pays the minimum of ${fmtCents.format(r.pay)} a ${r.unit}.`;
+  } else if (r.belowMin) {
+    hint.textContent = `That's below the minimum of ${fmtCents.format(r.pay)} a ${r.unit}, so the minimum is used.`;
+  } else {
+    const over = r.total - r.pay;
+    hint.textContent = over > 0.004
+      ? `${fmtCents.format(over)} a ${r.unit} above the minimum of ${fmtCents.format(r.pay)}.`
+      : `Same as the minimum repayment.`;
+  }
+}
+
+function renderMethodNote(inp, results) {
+  const m = results.find((r) => r.key === "monthly");
+  const f = results.find((r) => r.key === "fortnightly");
+  if (inp.method === "split") {
+    const saved = m.base.periods / 12 - f.base.periods / 26;
+    $("method-note").textContent =
+      `Split monthly pays half the monthly amount each fortnight (a quarter each week). That adds up to one extra monthly repayment a year, which on its own takes about ${duration(Math.max(0, saved) * 12, 12)} off the loan.`;
+  } else {
+    $("method-note").textContent =
+      "Bank minimum is the required repayment for each frequency over your remaining term. Switch to Split monthly to see the faster payoff from paying half the monthly amount each fortnight.";
+  }
+}
+
+function renderPlan(inp, r) {
+  const b = r.base, p = r.plan;
+  if (!hasPlan(inp)) {
+    $("plan-body").innerHTML = `
+      <div class="end-date"><span class="label">Debt-free by</span><span class="big num">${fmtMonthYear(dateAfter(b.periods, r.ppy))}</span><span class="per">in ${duration(b.periods, r.ppy)}, paying the minimum</span></div>
+      <div class="muted-box">Enter your own repayment, an offset balance or offset growth to see how much sooner you could be debt-free.</div>`;
+    return;
+  }
+  const pd = debtFree(p);
+  const savedInterest = b.interest - pd.interest;
+  const savedPeriods = b.periods - pd.periods;
+
+  let how;
+  if (p.coversAt === 0) {
+    how = "Your offset already holds enough to pay out the loan.";
+  } else if (pd.viaOffset) {
+    how = `Your offset catches up with the loan balance then, so you could pay the loan out in full. Left alone, the loan itself would run to ${fmtMonthYear(dateAfter(p.periods, r.ppy))}.`;
+  } else {
+    how = "Your repayments clear the loan before the offset catches up with the balance.";
+  }
+
+  $("plan-body").innerHTML = `
+    <div class="end-date"><span class="label">Debt-free by</span><span class="big num">${fmtMonthYear(dateAfter(pd.periods, r.ppy))}</span><span class="per">in ${duration(pd.periods, r.ppy)}, paying ${fmtCents.format(r.total)} a ${r.unit}</span></div>
+    <div class="compare">
+      <div class="col-head"></div>
+      <div class="col-head val label">Minimum only</div>
+      <div class="col-head val label">Your plan</div>
+
+      <div class="row-head">Debt-free</div>
+      <div class="val">${fmtMonthYear(dateAfter(b.periods, r.ppy))}</div>
+      <div class="val with">${fmtMonthYear(dateAfter(pd.periods, r.ppy))}</div>
+
+      <div class="row-head">Total interest</div>
+      <div class="val">${fmtDollars.format(b.interest)}</div>
+      <div class="val with">${fmtDollars.format(pd.interest)}</div>
+    </div>
+    <div class="savings">
+      <span>Interest saved <strong>${fmtDollars.format(savedInterest)}</strong></span>
+      <span>Time saved <strong>${duration(savedPeriods, r.ppy)}</strong></span>
+    </div>
+    <p class="crossover">${pd.viaOffset || p.coversAt === 0 ? '<span class="swatch offset"></span>' : ""}<span>${how}</span></p>
+    ${vhfLine()}`;
+}
+
+// One line on when the home is fully yours, including buying out the Homebuyer Fund
+function vhfLine() {
+  const v = vhfState;
+  if (!v || !v.ok) return "";
+  const b = v.best;
+  if (b.months >= 1200) return `<p class="crossover"><span class="swatch fund"></span><span>At this rate the Homebuyer Fund's ${fmtPlain.format(v.sharePts)}% isn't bought out within 100 years.</span></p>`;
+  return `<p class="crossover"><span class="swatch fund"></span><span>Including buying out the Homebuyer Fund's ${fmtPlain.format(v.sharePts)}%, you own the home outright by <strong>${fmtMonthYear(dateAfter(b.months, 12))}</strong> (${v.bestShort.toLowerCase()}, ${fmtDollars.format(b.buyback)} in buy-backs).</span></p>`;
+}
+
+function renderTable(results) {
+  $("table-body").innerHTML = results.map((r) => {
+    const d = debtFree(r.plan);
+    return `
+    <tr class="${r.key === selectedFreq ? "selected" : ""}">
+      <td>${r.label}</td>
+      <td class="num">${fmtCents.format(r.total)}</td>
+      <td class="num">${fmtDollars.format(d.interest)}</td>
+      <td class="num">${fmtMonthYear(dateAfter(d.periods, r.ppy))}</td>
+      <td class="num">${duration(d.periods, r.ppy)}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ---------- Optimiser: split a monthly budget between repayments and the offset ---------- */
+
+let bestSplit = null;   // remembered so "Use this split" can apply it
+
+function renderOptimiser(inp, r) {
+  // Default budget: what the current plan already puts in each month (repayment + offset growth)
+  const current = (r.total * r.ppy) / 12 + inp.growth;
+  const budget = inp.budget > 0 ? inp.budget : current;
+  $("budget").placeholder = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 0 }).format(Math.round(current));
+  $("opt-freq").textContent = `${r.label} repayments`;
+
+  const budgetPer = (budget * 12) / r.ppy;          // budget per repayment period
+  const minPay = r.pay;
+  const toMonthly = (v) => (v * r.ppy) / 12;
+  bestSplit = null;
+
+  $("budget-hint").textContent = inp.budget > 0
+    ? `${fmtCents.format(budgetPer)} a ${r.unit}. The minimum repayment is ${fmtCents.format(minPay)}.`
+    : `Blank uses what your plan puts in now: ${fmtDollars.format(current)} a month.`;
+
+  if (budgetPer < minPay - 0.005) {
+    $("opt-body").innerHTML = `<div class="muted-box">That budget is below the minimum repayment of ${fmtCents.format(minPay)} a ${r.unit} (${fmtDollars.format(toMonthly(minPay))} a month). Increase it to compare splits.</div>`;
+    return;
+  }
+  const spare = budgetPer - minPay;
+  if (spare < 1) {
+    $("opt-body").innerHTML = `<div class="muted-box">That budget only covers the minimum repayment, so there's nothing left to split.</div>`;
+    return;
+  }
+
+  // Try a split: `share` of the spare money goes to the offset, the rest to repayments
+  const trial = (share) => {
+    const dep = Math.round(spare * share * 100) / 100;
+    const pay = Math.round((budgetPer - dep) * 100) / 100;
+    const sim = simulate(inp.balance, inp.rate, r.ppy, pay, inp.offset, dep, inp.offsetPct / 100);
+    return { share, pay, dep, ...debtFree(sim) };
+  };
+
+  // Search 0%…100% in 5% steps. Fastest wins; ties go to the lower interest,
+  // then to more in the offset (same result, but the money stays accessible).
+  const trials = Array.from({ length: 21 }, (_, i) => trial(i / 20));
+  const fastest = Math.min(...trials.map((t) => t.periods));
+  const slowest = Math.max(...trials.map((t) => t.periods));
+  const best = trials
+    .filter((t) => t.periods <= fastest + 1)
+    .sort((a, b) => Math.round(a.interest / 50) - Math.round(b.interest / 50) || b.share - a.share)[0];
+  const allToRepay = trials[0], allToOffset = trials[20];
+  const noDifference = slowest - fastest <= 1 && Math.abs(allToRepay.interest - allToOffset.interest) < 250;
+  bestSplit = best;
+
+  let verdict;
+  if (noDifference) {
+    verdict = `<strong>It makes no real difference.</strong> With a ${fmtPlain.format(inp.offsetPct)}% offset, each dollar in the offset saves the same interest as a dollar of extra repayment, so every split is debt-free at about the same time. Keeping the extra in the offset gets the same result and leaves the money available if you need it.`;
+  } else if (best.share === 0) {
+    verdict = `<strong>Put the extra into repayments.</strong> Your offset only reduces interest on ${fmtPlain.format(inp.offsetPct)}% of its balance, so paying the loan down directly is debt-free ${duration(allToOffset.periods - best.periods, r.ppy)} sooner than saving it all in the offset.`;
+  } else {
+    verdict = `<strong>Best split: ${Math.round(best.share * 100)}% of the extra to the offset.</strong> It's debt-free ${duration(slowest - best.periods, r.ppy)} sooner than the slowest split.`;
+  }
+
+  const rows = [0, 5, 10, 15, 20].map((i) => trials[i]);
+  $("opt-body").innerHTML = `
+    <div class="end-date">
+      <span class="label">Recommended</span>
+      <span class="big num">${fmtMonthYear(dateAfter(best.periods, r.ppy))}</span>
+      <span class="per">Pay ${fmtCents.format(best.pay)} a ${r.unit} and add ${fmtDollars.format(toMonthly(best.dep))} a month to the offset. Debt-free in ${duration(best.periods, r.ppy)}.</span>
+    </div>
+    <p class="verdict">${verdict}</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Extra to offset</th><th>Repayment</th><th>Offset / month</th><th>Debt-free</th><th>Interest</th></tr></thead>
+        <tbody>${rows.map((t) => `
+          <tr class="${t === best ? "selected" : ""}">
+            <td>${Math.round(t.share * 100)}%</td>
+            <td class="num">${fmtCents.format(t.pay)}</td>
+            <td class="num">${fmtDollars.format(toMonthly(t.dep))}</td>
+            <td class="num">${fmtMonthYear(dateAfter(t.periods, r.ppy))}</td>
+            <td class="num">${fmtDollars.format(t.interest)}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </div>
+    <div class="opt-actions">
+      <button type="button" class="btn" id="apply-split">Use this split</button>
+      <span class="hint">Sets your repayment and offset growth above.</span>
+    </div>`;
+}
+
+/* ---------- Chart (hand-drawn SVG, redrawn on resize) ---------- */
+
+function niceStep(x) {
+  const exp = Math.pow(10, Math.floor(Math.log10(x)));
+  const f = x / exp;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * exp;
+}
+
+// Reduce a per-period history to roughly monthly points: [[years, value], ...]
+function toSeries(history, ppy) {
+  const step = Math.max(1, Math.round(ppy / 12));
+  const pts = [];
+  for (let i = 0; i < history.length; i += step) pts.push([i / ppy, history[i]]);
+  const last = history.length - 1;
+  if (pts[pts.length - 1][0] !== last / ppy) pts.push([last / ppy, history[last]]);
+  return pts;
+}
+
+// Value at a given year, interpolated along a series (holds its last value after it ends).
+function valueAt(series, year) {
+  if (year >= series[series.length - 1][0]) return series[series.length - 1][1];
+  let lo = 0, hi = series.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (series[mid][0] <= year) lo = mid; else hi = mid; }
+  const [x0, y0] = series[lo], [x1, y1] = series[hi];
+  return y0 + ((y1 - y0) * (year - x0)) / (x1 - x0 || 1);
+}
+
+let chartState = null;
+
+function renderChart(inp, r) {
+  const box = $("chart");
+  const W = Math.max(280, box.clientWidth || 600);
+  const H = W < 480 ? 220 : 260;
+  const pad = { l: 52, r: 14, t: 12, b: 28 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+
+  // With a Homebuyer Fund share, follow the recommended buy-back order month by month:
+  // loan (jumps if refinanced), offset (drops at each buy-back) and the Fund's share value.
+  const v = vhfState && vhfState.ok ? vhfState : null;
+  const plan = hasPlan(inp) || !!v;
+  const showOffsetLine = inp.offset > 0 || inp.growth > 0;
+  const base = toSeries(r.base.history, r.ppy);
+  const pl = v ? toSeries(v.best.hBal, 12) : toSeries(r.plan.history, r.ppy);
+  const offs = v ? toSeries(v.best.hOff, 12) : toSeries(r.plan.offsetHistory, r.ppy);
+  const fund = v ? toSeries(v.best.hFund, 12) : null;
+  // Offset line: only up to the point it's still a separate balance (it keeps growing after payout otherwise)
+  const offShown = v ? offs.filter(([x]) => x <= pl[pl.length - 1][0] + 1e-9) : offs;
+
+  const xMax = Math.max(base[base.length - 1][0], pl[pl.length - 1][0], 0.1);
+  const peak = Math.max(inp.balance, ...pl.map((p) => p[1]), showOffsetLine ? Math.max(...offShown.map((p) => p[1])) : 0, fund ? Math.max(...fund.map((p) => p[1])) : 0);
+  const yStep = niceStep(peak / 4);
+  const yMax = Math.ceil(peak / yStep) * yStep;
+
+  const sx = (x) => pad.l + (x / xMax) * iw;
+  const sy = (y) => pad.t + ih - (Math.min(y, yMax) / yMax) * ih;
+  const path = (s) => s.map(([x, y], i) => `${i ? "L" : "M"}${sx(x).toFixed(1)},${sy(y).toFixed(1)}`).join("");
+
+  // Axis ticks
+  let yTicks = "";
+  for (let v = 0; v <= yMax + 1e-6; v += yStep) {
+    yTicks += `<line class="gridline" x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}"/>
+               <text class="ax" x="${pad.l - 8}" y="${sy(v) + 4}" text-anchor="end">${compactMoney(v)}</text>`;
+  }
+  const xStep = xMax <= 6 ? 1 : xMax <= 12 ? 2 : 5;
+  let xTicks = "";
+  for (let v = 0; v <= xMax + 1e-6; v += xStep) {
+    if (xMax - v < xStep * 0.4 && v !== 0 && v < xMax) continue;   // avoid crowding the right edge
+    xTicks += `<text class="ax" x="${sx(v)}" y="${H - 8}" text-anchor="middle">${v}y</text>`;
+  }
+
+  const areaPath = path(pl) + `L${sx(pl[pl.length - 1][0])},${sy(0)}L${sx(0)},${sy(0)}Z`;
+
+  box.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Loan balance over time, repayments only compared with your plan">
+      ${yTicks}${xTicks}
+      ${plan ? `<path class="area-off" d="${areaPath}" opacity="0.7"/>` : ""}
+      ${plan ? `<path class="line-base" d="${path(base)}"/>` : ""}
+      ${showOffsetLine ? `<path class="line-offset" d="${path(offShown)}"/>` : ""}
+      ${fund ? `<path class="line-fund" d="${path(fund)}"/>` : ""}
+      <path class="line-off" d="${path(pl)}"/>
+      <g id="cursor" hidden>
+        <line class="cursor" id="cursor-line" y1="${pad.t}" y2="${pad.t + ih}"/>
+        ${plan ? `<circle class="dot-base" id="dot-base" r="3.5"/>` : ""}
+        ${showOffsetLine ? `<circle class="dot-offset" id="dot-offset" r="3.5"/>` : ""}
+        ${fund ? `<circle class="dot-fund" id="dot-fund" r="3.5"/>` : ""}
+        <circle class="dot-off" id="dot-off" r="4.5"/>
+      </g>
+    </svg>`;
+
+  chartState = { inp, r, base, pl, offs: offShown, fund, v, sx, sy, xMax, pad, iw, W, plan, showOffsetLine };
+  resetReadout();
+}
+
+function resetReadout() {
+  if (!chartState) return;
+  const { r, plan, showOffsetLine, fund, v, pl } = chartState;
+  $("chart-readout").innerHTML = plan
+    ? `<span class="key"><span class="swatch"></span>${v ? `Loan incl. Fund buy-back · paid out in ${duration(v.best.loanDoneAt ?? v.best.months, 12)}` : `Your plan · ${duration(r.plan.periods, r.ppy)}`}</span>
+       ${fund ? `<span class="key"><span class="swatch fund"></span>Fund's share · out by ${fmtMonthYear(dateAfter(v.best.months, 12))}</span>` : ""}
+       <span class="key"><span class="swatch base"></span>Minimum only · ${duration(r.base.periods, r.ppy)}</span>
+       ${showOffsetLine ? `<span class="key"><span class="swatch offset"></span>Offset balance</span>` : ""}`
+    : `<span class="key"><span class="swatch"></span>Balance · paid off in ${duration(r.base.periods, r.ppy)}</span>`;
+}
+
+function onChartMove(e) {
+  if (!chartState) return;
+  const svg = $("chart").querySelector("svg");
+  const rect = svg.getBoundingClientRect();
+  const { sx, sy, xMax, pad, iw, W, base, pl, offs, fund, plan, showOffsetLine } = chartState;
+  const px = ((e.clientX - rect.left) / rect.width) * W;
+  const year = Math.min(xMax, Math.max(0, ((px - pad.l) / iw) * xMax));
+  const vPlan = valueAt(pl, year), vBase = valueAt(base, year), vOff = valueAt(offs, year), vFund = fund ? valueAt(fund, year) : 0;
+  const setDot = (id, y) => { const d = $(id); if (d) { d.setAttribute("cx", sx(year)); d.setAttribute("cy", sy(y)); } };
+
+  $("cursor").hidden = false;
+  $("cursor-line").setAttribute("x1", sx(year));
+  $("cursor-line").setAttribute("x2", sx(year));
+  setDot("dot-off", vPlan);
+  if (plan) setDot("dot-base", vBase);
+  if (showOffsetLine) setDot("dot-offset", vOff);
+  if (fund) setDot("dot-fund", vFund);
+
+  const yrs = Math.floor(year), mths = Math.round((year - yrs) * 12);
+  const when = `After ${yrs} yr${yrs === 1 ? "" : "s"}${mths ? ` ${mths} mth${mths === 1 ? "" : "s"}` : ""}`;
+  const k = (cls, v) => `<span class="key"><span class="swatch ${cls}"></span><span class="num">${fmtDollars.format(v)}</span></span>`;
+  $("chart-readout").innerHTML = `<span>${when}</span>${k("", vPlan)}${plan ? k("base", vBase) : ""}${showOffsetLine ? k("offset", vOff) : ""}${fund ? k("fund", vFund) : ""}`;
+}
+function onChartLeave() {
+  const c = $("cursor"); if (c) c.hidden = true;
+  resetReadout();
+}
+
+/* ---------- Historic data (embedded; the page can't fetch live data) ---------- */
+
+// RBA cash rate target changes: [effective date, new cash rate %].
+// Source: RBA cash rate target table (rba.gov.au/statistics/cash-rate), to the 29 Sep 2026 decision.
+const RBA_CHANGES = [
+  ["1990-08-02",14.00],["1990-10-15",13.00],["1990-12-18",12.00],["1991-04-04",11.50],["1991-05-16",10.50],
+  ["1991-09-03",9.50],["1991-11-06",8.50],["1992-01-08",7.50],["1992-05-06",6.50],["1992-07-08",5.75],
+  ["1993-03-23",5.25],["1993-07-30",4.75],["1994-08-17",5.50],["1994-10-24",6.50],["1994-12-14",7.50],
+  ["1996-07-31",7.00],["1996-11-06",6.50],["1996-12-11",6.00],["1997-05-23",5.50],["1997-07-30",5.00],
+  ["1998-12-02",4.75],["1999-11-03",5.00],["2000-02-02",5.50],["2000-04-05",5.75],["2000-05-03",6.00],
+  ["2000-08-02",6.25],["2001-02-07",5.75],["2001-03-07",5.50],["2001-04-04",5.00],["2001-09-05",4.75],
+  ["2001-10-03",4.50],["2001-12-05",4.25],["2002-05-08",4.50],["2002-06-05",4.75],["2003-11-05",5.00],
+  ["2003-12-03",5.25],["2005-03-02",5.50],["2006-05-03",5.75],["2006-08-02",6.00],["2006-11-08",6.25],
+  ["2007-08-08",6.50],["2007-11-07",6.75],["2008-02-06",7.00],["2008-03-05",7.25],["2008-09-03",7.00],
+  ["2008-10-08",6.00],["2008-11-05",5.25],["2008-12-03",4.25],["2009-02-04",3.25],["2009-04-08",3.00],
+  ["2009-10-07",3.25],["2009-11-04",3.50],["2009-12-02",3.75],["2010-03-03",4.00],["2010-04-07",4.25],
+  ["2010-05-05",4.50],["2010-11-03",4.75],["2011-11-02",4.50],["2011-12-07",4.25],["2012-05-02",3.75],
+  ["2012-06-06",3.50],["2012-10-03",3.25],["2012-12-05",3.00],["2013-05-08",2.75],["2013-08-07",2.50],
+  ["2015-02-04",2.25],["2015-05-06",2.00],["2016-05-04",1.75],["2016-08-03",1.50],["2019-06-05",1.25],
+  ["2019-07-03",1.00],["2019-10-02",0.75],["2020-03-04",0.50],["2020-03-20",0.25],["2020-11-04",0.10],
+  ["2022-05-04",0.35],["2022-06-08",0.85],["2022-07-06",1.35],["2022-08-03",1.85],["2022-09-07",2.35],
+  ["2022-10-05",2.60],["2022-11-02",2.85],["2022-12-07",3.10],["2023-02-08",3.35],["2023-03-08",3.60],
+  ["2023-05-03",3.85],["2023-06-07",4.10],["2023-11-08",4.35],["2025-02-19",4.10],["2025-05-21",3.85],
+  ["2025-08-13",3.60],["2026-02-04",3.85],["2026-03-18",4.10],["2026-05-06",4.35],["2026-09-30",4.60],
+].map(([d, r]) => ({ date: new Date(d + "T00:00:00"), rate: r }));
+
+// Suburb market snapshot, researched Sep 2026. Medians differ by source because each uses
+// different sales windows and methods; unit samples are small (about 100 sales a year).
+const MARKET = {
+  suburb: "Mooroolbark VIC 3138",
+  asAt: "Sep 2026",
+  house: [
+    { source: "Cotality (CoreLogic)", kind: "Bank data", median: 910000, change: 4.24, period: "12 mths to Jun 2026", url: "https://www.propertyvalue.com.au/suburb/mooroolbark-3138-vic" },
+    { source: "HTAG Analytics", kind: "Market data", median: 988000, change: 5.30, period: "Median value, 10-yr +50.9%", url: "https://www.htag.com.au/vic/vic206-yarra-ranges-shire/mooroolbark-vic-3138/" },
+    { source: "Barry Plant", kind: "Real estate", median: 875000, change: 6.0, period: "Current", url: "https://www.barryplant.com.au/suburb-profile/regional-victoria/yarra-ranges-outer-east/mooroolbark/" },
+    { source: "OpenAgent", kind: "Real estate", median: 868000, change: 6.9, period: "Last 3 mths", url: "https://www.openagent.com.au/suburb-profiles/mooroolbark-3138" },
+    { source: "Domain", kind: "Real estate", median: null, beds: "3-bed $825,000 · 4-bed $1,008,000", period: "Last 12 mths", url: "https://www.domain.com.au/suburb-profile/mooroolbark-vic-3138" },
+  ],
+  // 2-bedroom units and townhouses. Small samples: treat as a range, not a price.
+  unit2: [
+    { source: "Domain sales", kind: "2-bed townhouse sales", median: 520000, sales: "$455,000 · $520,000 · $525,000", period: "Recent comparable sales", url: "https://www.domain.com.au/sale/mooroolbark-vic-3138/town-house/2-bedrooms/" },
+    { source: "Domain listings", kind: "2-bed townhouses asking", median: 620000, sales: "$590,000–$655,000 asking", period: "For sale, Sep 2026", url: "https://www.domain.com.au/sale/mooroolbark-vic-3138/town-house/2-bedrooms/" },
+    { source: "Real Estate Investar", kind: "Townhouse listings", median: 635000, period: "Median asking price", url: "https://www.realestateinvestar.com.au/property/mooroolbark" },
+    { source: "Domain", kind: "2-bed unit sales", median: 676000, period: "Median, last 12 mths (20 sales)", url: "https://www.domain.com.au/suburb-profile/mooroolbark-vic-3138" },
+  ],
+  unit: [
+    { source: "Cotality (CoreLogic)", kind: "Bank data", median: 667500, change: -2.70, period: "12 mths to Jun 2026", url: "https://www.yourinvestmentpropertymag.com.au/top-suburbs/vic/3138-mooroolbark" },
+    { source: "OpenAgent", kind: "Real estate", median: 710000, change: 8.0, period: "Last 3 mths", url: "https://www.openagent.com.au/suburb-profiles/mooroolbark-3138" },
+    { source: "Barry Plant", kind: "Real estate", median: 738000, change: 5.43, period: "Current", url: "https://www.barryplant.com.au/suburb-profile/regional-victoria/yarra-ranges-outer-east/mooroolbark/" },
+    { source: "Domain", kind: "Real estate", median: null, beds: "2-bed $676,000 · 3-bed $775,000", period: "Last 12 mths", url: "https://www.domain.com.au/suburb-profile/mooroolbark-vic-3138" },
+  ],
+};
+
+const fmtDay = (d) => d.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" });
+const fmtPct = (v, dp = 2) => `${v.toFixed(dp)}%`;
+const signed = (v, dp = 2) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(dp);
+
+// Cash rate in effect on a date (null before the data starts)
+function cashRateOn(date) {
+  let rate = null;
+  for (const c of RBA_CHANGES) { if (c.date <= date) rate = c.rate; else break; }
+  return rate;
+}
+
+/* ---------- Rate history panel ---------- */
+
+function renderRateHistory(inp) {
+  const start = new Date(inp.startYear, inp.startMonth, 1);
+  const startRate = parseNum($("startrate").value);
+  const hasStart = Number.isFinite(startRate) && startRate > 0 && startRate < 30;
+  const cashStart = cashRateOn(start);
+  const last = RBA_CHANGES[RBA_CHANGES.length - 1];
+  const cashNow = last.rate;
+  $("rates-since").textContent = `Since ${fmtMonthYear(start)}`;
+
+  if (cashStart === null) {
+    $("rates-body").innerHTML = `<div class="muted-box">Cash rate data here starts in August 1990. Use a later start date to see rate history.</div>`;
+    $("rates-chart").innerHTML = ""; $("rates-legend").innerHTML = ""; $("rates-table").innerHTML = "";
+    return;
+  }
+
+  const since = RBA_CHANGES.filter((c) => c.date > start);
+  const shift = hasStart ? startRate - cashStart : 0;          // your margin over the cash rate
+  const estNow = hasStart ? cashNow + shift : null;
+  const pending = last.date > TODAY ? last : null;              // announced but not yet effective
+
+  let body;
+  if (hasStart) {
+    const diff = estNow - inp.rate;
+    body = `
+      <div class="end-date"><span class="label">Estimated rate now</span><span class="big num">${fmtPct(estNow)}</span>
+        <span class="per">Started at ${fmtPct(startRate)} when the cash rate was ${fmtPct(cashStart)}. It's now ${fmtPct(cashNow)} (${signed(cashNow - cashStart)} points).</span></div>
+      ${pending ? `<p class="hint">Includes the rise announced today, effective ${fmtDay(pending.date)}. Lenders usually pass changes on within a couple of weeks.</p>` : ""}
+      ${Math.abs(diff) >= 0.005 ? `<div class="opt-actions"><button type="button" class="btn" id="use-est-rate">Use ${fmtPct(estNow)} in the calculator</button><span class="hint">The rate above is ${fmtPct(inp.rate)} (${signed(-diff)} points from this estimate).</span></div>` : `<p class="hint">Matches the interest rate you've entered above.</p>`}`;
+  } else {
+    body = `<div class="muted-box">The cash rate was ${fmtPct(cashStart)} when your loan started and is ${fmtPct(cashNow)} now (${signed(cashNow - cashStart)} points). Enter your starting rate to estimate yours.</div>`;
+  }
+  $("rates-body").innerHTML = body;
+
+  // Table of changes since the start
+  $("rates-summary").textContent = `RBA changes since you started (${since.length})`;
+  $("rates-your-col").hidden = !hasStart;
+  let prev = cashStart;
+  $("rates-table").innerHTML = since.length ? since.map((c) => {
+    const ch = c.rate - prev; prev = c.rate;
+    return `<tr><td>${fmtDay(c.date)}</td><td class="num ${ch > 0 ? "neg" : "pos"}">${signed(ch)}</td><td class="num">${fmtPct(c.rate)}</td>${hasStart ? `<td class="num">${fmtPct(c.rate + shift)}</td>` : ""}</tr>`;
+  }).reverse().join("") : `<tr><td colspan="4">No changes since your loan started.</td></tr>`;
+
+  renderRateChart(start, cashStart, since, hasStart ? shift : null);
+}
+
+function renderRateChart(start, cashStart, since, shift) {
+  const box = $("rates-chart");
+  const W = Math.max(280, box.clientWidth || 600);
+  const H = W < 480 ? 180 : 210;
+  const pad = { l: 44, r: 14, t: 10, b: 26 };
+  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  const end = new Date(Math.max(TODAY.getTime(), since.length ? since[since.length - 1].date.getTime() : 0) + 20 * 86400000);
+  const t0 = start.getTime(), t1 = end.getTime();
+
+  // Step series of the cash rate
+  const steps = [[t0, cashStart]];
+  let cur = cashStart;
+  for (const c of since) { steps.push([c.date.getTime(), cur], [c.date.getTime(), c.rate]); cur = c.rate; }
+  steps.push([t1, cur]);
+
+  const all = steps.map((s) => s[1]).concat(shift !== null ? steps.map((s) => s[1] + shift) : []);
+  const yMax = Math.max(1, Math.ceil(Math.max(...all) + 0.5));
+  const yStep = yMax <= 5 ? 1 : yMax <= 10 ? 2 : 5;
+  const sx = (t) => pad.l + ((t - t0) / (t1 - t0)) * iw;
+  const sy = (v) => pad.t + ih - (v / yMax) * ih;
+  const path = (pts, add = 0) => pts.map(([t, v], i) => `${i ? "L" : "M"}${sx(t).toFixed(1)},${sy(v + add).toFixed(1)}`).join("");
+
+  let grid = "";
+  for (let v = 0; v <= yMax + 1e-9; v += yStep) {
+    grid += `<line class="gridline" x1="${pad.l}" x2="${W - pad.r}" y1="${sy(v)}" y2="${sy(v)}"/><text class="ax" x="${pad.l - 8}" y="${sy(v) + 4}" text-anchor="end">${v}%</text>`;
+  }
+  // Year ticks
+  const y0 = start.getFullYear(), y1 = end.getFullYear();
+  const span = y1 - y0;
+  const every = span <= 6 ? 1 : span <= 14 ? 2 : 5;
+  let xt = "";
+  for (let y = y0 + 1; y <= y1; y++) {
+    if ((y - y0) % every) continue;
+    const t = new Date(y, 0, 1).getTime();
+    if (t > t1) break;
+    xt += `<text class="ax" x="${sx(t)}" y="${H - 7}" text-anchor="middle">${y}</text>`;
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cash rate${shift !== null ? " and your estimated rate" : ""} since the loan started">
+    ${grid}${xt}
+    <path class="line-cash" d="${path(steps)}"/>
+    ${shift !== null ? `<path class="line-rate" d="${path(steps, shift)}"/>` : ""}
+  </svg>`;
+  $("rates-legend").innerHTML = `${shift !== null ? `<span class="key"><span class="swatch"></span>Your estimated rate</span>` : ""}<span class="key"><span class="swatch base"></span>RBA cash rate</span>`;
+}
+
+/* ---------- Property value panel ---------- */
+
+function renderProperty(inp) {
+  const type = document.querySelector('input[name="dtype"]:checked').value;
+  const rows = MARKET[type];
+  $("prop-suburb").textContent = MARKET.suburb;
+
+  // Spread of medians across sources
+  const medians = rows.filter((r) => r.median).map((r) => r.median);
+  const lo = Math.min(...medians), hi = Math.max(...medians);
+  const vals = {
+    purchase: optMoney("v-purchase"), council: optMoney("v-council"),
+    bank: optMoney("v-bank"), agent: optMoney("v-agent"),
+  };
+  const mine = [vals.bank, vals.council, vals.agent].filter((v) => v > 0);
+  const latestMine = vals.bank || vals.agent || vals.council || 0;
+
+  // Place medians (and your latest valuation) on one bar
+  const barLo = Math.min(lo, latestMine || lo) * 0.97, barHi = Math.max(hi, latestMine || hi) * 1.03;
+  const pos = (v) => ((v - barLo) / (barHi - barLo)) * 100;
+
+  $("market-body").innerHTML = `
+    <p class="verdict">Sources put ${type === "unit2" ? "a 2-bedroom unit or townhouse" : type === "house" ? "the median house" : "the median unit or townhouse"} between <strong class="num">${fmtDollars.format(lo)}</strong> and <strong class="num">${fmtDollars.format(hi)}</strong>, a ${Math.round(((hi - lo) / lo) * 100)}% spread.${latestMine ? "" : ""}</p>
+    <div class="range-bar" aria-hidden="true">
+      <div class="track"></div>
+      ${medians.map((m) => `<div class="tick" style="left:calc(${pos(m).toFixed(2)}% - 1px)"></div>`).join("")}
+      ${latestMine ? `<div class="tick you" style="left:calc(${pos(latestMine).toFixed(2)}% - 1px)"></div>` : ""}
+    </div>
+    <div class="chart-readout"><span class="key"><span class="swatch"></span>Suburb medians</span>${latestMine ? `<span class="key"><span class="swatch offset"></span>Your latest valuation</span>` : ""}</div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Source</th><th>Median</th><th>12 mths</th></tr></thead>
+        <tbody>${rows.map((r) => `
+          <tr>
+            <td class="stack"><a href="${r.url}" target="_blank" rel="noopener">${r.source}</a><span class="sub">${r.kind} · ${r.period}</span></td>
+            <td class="num ${r.median ? "" : "wrap"}">${r.median ? fmtDollars.format(r.median) + (r.sales ? `<span class="sub">${r.sales}</span>` : "") : r.beds.replace(" · ", "<br>")}</td>
+            <td class="num ${r.change > 0 ? "pos" : r.change < 0 ? "neg" : ""}">${r.change !== undefined ? signed(r.change, 1) + "%" : "–"}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+
+  // Equity and LVR under each valuation you've entered
+  const debt = inp.balance;
+  const net = Math.max(0, inp.balance - inp.offset);
+  const start = new Date(inp.startYear, inp.startMonth, 1);
+  const yearsHeld = Math.max(0, (TODAY - start) / (365.25 * 86400000));
+  const list = [
+    ["Bank valuation", vals.bank], ["Agent appraisal", vals.agent],
+    ["Council valuation", vals.council], [`Purchase price (${fmtMonthYear(start)})`, vals.purchase],
+  ].filter(([, v]) => v > 0);
+
+  if (!list.length) {
+    $("equity-body").innerHTML = `<div class="muted-box">Enter a valuation to see your equity and loan-to-value ratio (LVR) under each one.</div>`;
+  } else {
+    const growth = (v) => {
+      if (!(vals.purchase > 0) || v === vals.purchase || yearsHeld < 0.25) return "–";
+      const total = (v / vals.purchase - 1) * 100;
+      const pa = (Math.pow(v / vals.purchase, 1 / yearsHeld) - 1) * 100;
+      return `${signed(total, 1)}% (${signed(pa, 1)}% a yr)`;
+    };
+    $("equity-body").innerHTML = `
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Valuation</th><th>Equity</th><th>LVR</th></tr></thead>
+          <tbody>${list.map(([name, v]) => {
+            const lvr = (debt / v) * 100;
+            return `<tr>
+              <td class="stack">${name}<span class="sub num">${fmtDollars.format(v)}${growth(v) !== "–" ? ` · ${growth(v)} since purchase` : ""}</span></td>
+              <td class="num">${fmtDollars.format(v * (1 - vhfSharePct() / 100) - net)}</td>
+              <td class="num ${lvr > 80 ? "lvr-high" : ""}">${lvr.toFixed(1)}%</td>
+            </tr>`;
+          }).join("")}</tbody>
+        </table>
+      </div>
+      <p class="hint">Equity counts your offset balance against the loan${vhfSharePct() ? ` and excludes the Homebuyer Fund's ${fmtPlain.format(vhfSharePct())}% share` : ""}. LVR uses the loan balance alone, as lenders do; above 80% usually means mortgage insurance if you refinance.${mine.length > 1 ? ` Your valuations differ by ${fmtDollars.format(Math.max(...mine) - Math.min(...mine))}.` : ""}</p>`;
+  }
+
+  $("market-sources").innerHTML = `Suburb figures researched ${MARKET.asAt}. 2-bedroom figures rest on a handful of sales and current asking prices, so your own valuation will be more accurate. Each source uses different sales windows and methods, and unit figures rest on roughly 100 sales a year, so treat them as a range. Cotality (CoreLogic) data sits behind many lenders' desktop valuations. Cash rates: <a href="https://www.rba.gov.au/statistics/cash-rate/" target="_blank" rel="noopener">RBA cash rate target</a>, to the 29 Sep 2026 decision.`;
+}
+
+/* ---------- Victorian Homebuyer Fund buy-back ---------- */
+// Rules used (State Revenue Office scheme; closed to new participants):
+//  • Voluntary buy-backs must cut the State's share by at least 5 percentage points and be at least $10,000.
+//  • The price is that percentage of the property's current market value (the State arranges a valuation).
+//  • No interest is charged; the share must be repaid within the loan term plus 60 days, or on sale.
+
+function vhfSharePct() {
+  const v = parseNum($("vhf-share").value);
+  return Number.isFinite(v) && v > 0 && v < 100 ? v : 0;
+}
+
+// Month-by-month simulation of the loan plus the Fund's share.
+// strategy "fund-first": buy 5-point tranches from the offset as soon as it can afford one, then clear the loan.
+// strategy "loan-first": let the offset clear the loan, then save the full repayment to buy the share back.
+function simulateVHF(inp, strategy, o) {
+  const r = inp.rate / 100 / 12, link = inp.offsetPct / 100;
+  const g = Math.pow(1 + o.growth / 100, 1 / 12) - 1;
+  let bal = inp.balance, off = inp.offset, pts = o.sharePts, value = o.value;
+  let interest = 0, buyback = 0, m = 0, loanDoneAt = null, shareDoneAt = pts <= 0 ? 0 : null;
+  const events = [];
+
+  const buyTranches = () => {
+    while (pts > 0) {
+      const step = Math.min(5, pts);                         // 5 points, or whatever is left
+      const cost = Math.max((value * step) / 100, 10000);    // $10,000 minimum payment
+      if (off < cost) break;
+      off -= cost; buyback += cost; pts = Math.round((pts - step) * 100) / 100;
+      events.push({ m, pts, cost });
+    }
+  };
+  const payOutLoan = () => {
+    if (bal > 0.005 && off >= bal) { off -= bal; bal = 0; loanDoneAt = m; }
+  };
+
+  let forced = null;   // what the income-threshold repayment achieved
+  // Month-by-month history for the projection chart
+  const hBal = [bal], hOff = [off], hFund = [(value * pts) / 100];
+
+  while ((bal > 0.005 || pts > 0) && m < 1200) {
+    m++;
+    value *= 1 + g;
+    const rentNow = o.rent && m > o.rent.from ? o.rent.per : 0;   // rental cash flow once renting starts
+    if (bal > 0.005) {
+      const i = Math.max(0, bal - off * link) * r;
+      const p = Math.min(o.pay, bal + i);
+      bal += i - p; interest += i; off = Math.max(0, off + o.deposit + rentNow);
+      if (bal <= 0.005) { bal = 0; loanDoneAt = m; }
+    } else {
+      off = Math.max(0, off + o.pay + o.deposit + rentNow);  // loan gone: the repayment becomes savings
+    }
+
+    // Income over the threshold: required buy-back "as circumstances permit" on the due date.
+    // Pay 5-point steps from the offset (if allowed), topping up by refinancing to the LVR cap.
+    if (o.forceAt && m === o.forceAt && pts > 0) {
+      forced = { m, value, before: pts, fromOffset: 0, borrowed: 0, cost: 0, lvrBefore: bal / value };
+      while (pts > 0) {
+        const step = Math.min(5, pts);
+        const cost = Math.max((value * step) / 100, 10000);
+        const useOff = o.useOffset ? Math.min(off, cost) : 0;
+        const borrow = cost - useOff;
+        if (bal + borrow > (value * o.lvrCap) / 100 + 0.01) break;   // lender won't go further
+        off -= useOff; bal += borrow; buyback += cost;
+        forced.fromOffset += useOff; forced.borrowed += borrow; forced.cost += cost;
+        pts = Math.round((pts - step) * 100) / 100;
+        events.push({ m, pts, cost, borrowed: borrow });
+      }
+      forced.after = pts;
+      forced.balAfter = bal;
+      if (bal > 0.005) loanDoneAt = null;                   // refinancing can reopen a cleared loan
+    }
+    if (strategy === "fund-first") { buyTranches(); if (pts <= 0) payOutLoan(); }
+    else { payOutLoan(); if (bal <= 0.005) buyTranches(); }
+    if (pts <= 0 && shareDoneAt === null) shareDoneAt = m;
+    hBal.push(Math.max(0, bal)); hOff.push(off); hFund.push((value * pts) / 100);
+  }
+  return { months: m, loanDoneAt, shareDoneAt, interest, buyback, total: interest + buyback, events, valueEnd: value, forced, hBal, hOff, hFund };
+}
+
+// Read the Fund inputs and simulate both repayment orders. Stored in `vhfState` so the
+// projection chart and the loan end date panel can use the same result.
+let vhfState = null;
+
+function computeVHF(inp, r) {
+  const sharePts = vhfSharePct();
+  // Value: what you entered, else your latest valuation, else the suburb Cotality median
+  const latest = optMoney("v-bank") || optMoney("v-agent") || optMoney("v-council");
+  const type = document.querySelector('input[name="dtype"]:checked').value;
+  const meds = MARKET[type].filter((x) => x.median).map((x) => x.median).sort((a, b) => a - b);
+  const mid = meds.length % 2 ? meds[(meds.length - 1) / 2] : (meds[meds.length / 2 - 1] + meds[meds.length / 2]) / 2;
+  const fallback = latest || mid;
+  const entered = optMoney("vhf-value");
+  const value = entered > 0 ? entered : fallback;
+  const growth = parseNum($("vhf-growth").value);
+  const incomeOver = $("vhf-income").checked;
+  const base = { sharePts, value, growth, latest, type, fallback, entered, incomeOver };
+
+  if (!sharePts) return { ...base, ok: false, msg: "Enter the Fund's share (for example 25%) to see what it costs to buy back." };
+  if (!Number.isFinite(growth) || growth < -10 || growth > 20) return { ...base, ok: false, msg: "Enter an expected growth rate between −10% and 20% a year." };
+
+  // Income-threshold repayment settings
+  const dueYear = parseNum($("vhf-due-year").value), dueMonth = parseInt($("vhf-due-month").value, 10);
+  const lvrCap = parseNum($("vhf-lvr").value);
+  const now = new Date();
+  const forceAt = incomeOver && Number.isFinite(dueYear)
+    ? Math.max(1, (dueYear - now.getFullYear()) * 12 + (dueMonth - now.getMonth()))
+    : 0;
+
+  // Simulate both orders with the plan's monthly-equivalent repayment and offset growth
+  const o = {
+    sharePts, value, growth, pay: (r.total * r.ppy) / 12, deposit: inp.growth,
+    forceAt, lvrCap: Number.isFinite(lvrCap) && lvrCap > 0 ? lvrCap : 80, useOffset: $("vhf-useoffset").checked,
+    rent: r.rental && inp.rental.project ? { from: inp.rental.monthsUntil, per: r.rental.extraCash / 12 } : null,
+  };
+  const ff = simulateVHF(inp, "fund-first", o);
+  const lf = simulateVHF(inp, "loan-first", o);
+  const best = ff.months < lf.months || (ff.months === lf.months && ff.total <= lf.total) ? ff : lf;
+  return {
+    ...base, ok: true, forceAt, o, ff, lf, best,
+    other: best === ff ? lf : ff,
+    bestName: best === ff ? "Buy back the Fund first" : "Clear the loan first",
+    bestShort: best === ff ? "Fund first" : "Loan first",
+  };
+}
+
+function renderVHF(inp, r) {
+  const v = vhfState;
+  $("vhf-value").placeholder = new Intl.NumberFormat("en-AU").format(v.fallback);
+  $("vhf-value-hint").textContent = v.entered > 0 ? "Your figure." :
+    v.latest ? "Blank uses your latest valuation below." : `Blank uses the middle of the ${v.type === "unit2" ? "2-bed unit and townhouse" : v.type === "house" ? "house" : "unit"} estimates. Your own valuation is better.`;
+  $("vhf-income-fields").hidden = !v.incomeOver;
+  $("vhf-useoffset").closest("label").hidden = !v.incomeOver;
+  if (!v.ok) { $("vhf-body").innerHTML = `<div class="muted-box">${v.msg}</div>`; return; }
+
+  const { sharePts, value, growth, incomeOver, forceAt, o, ff, lf, best, other, bestName } = v;
+  const costNow = (value * sharePts) / 100;
+  const step = Math.max(value * 0.05, 10000);
+  const net = Math.max(0, inp.balance - inp.offset);
+  const yourEquity = value * (1 - sharePts / 100) - net;
+
+  // Deadline: loan term + 60 days
+  const due = dateAfter(inp.remainingMonths, 12); due.setDate(due.getDate() + 60);
+  const late = (s) => s.shareDoneAt !== null && dateAfter(s.shareDoneAt, 12) > due;
+  const cap = (s) => s.months >= 1200;
+
+  // Holding cost comparison for the next year
+  const holdCost = costNow * (growth / 100);
+  const offsetSaves = costNow * (inp.rate / 100) * (inp.offsetPct / 100);
+
+  const row = (name, s) => `
+    <tr class="${s === best ? "selected" : ""}">
+      <td>${name}</td>
+      <td class="num">${cap(s) ? "Over 100 yrs" : fmtMonthYear(dateAfter(s.months, 12))}</td>
+      <td class="num">${fmtDollars.format(s.interest)}</td>
+      <td class="num">${fmtDollars.format(s.buyback)}</td>
+      <td class="num">${fmtDollars.format(s.total)}</td>
+    </tr>`;
+
+  const timeline = best.events.map((e) => `<tr><td>${fmtMonthYear(dateAfter(e.m, 12))}${e.borrowed !== undefined ? '<span class="sub">Required · income</span>' : ""}</td><td class="num">${fmtDollars.format(e.cost)}</td><td class="num">${e.pts}%</td></tr>`).join("");
+
+  let verdict;
+  if (Math.abs(ff.total - lf.total) < 1000 && Math.abs(ff.months - lf.months) <= 1) {
+    verdict = `<strong>Either order works about the same.</strong> At ${fmtPlain.format(growth)}% growth the Fund's share costs you roughly what your ${fmtPct(inp.rate)} mortgage does.`;
+  } else if (best === ff) {
+    verdict = `<strong>Buy back the Fund first.</strong> At ${fmtPlain.format(growth)}% a year, the Fund's share grows faster than your mortgage interest costs you, so each dollar spent buying it back saves more than the same dollar in your offset. You own the home outright ${other.months > best.months ? `${duration(other.months - best.months, 12)} sooner and ` : ""}${fmtDollars.format(other.total - best.total)} cheaper.`;
+  } else {
+    verdict = `<strong>Clear the loan first.</strong> Your ${fmtPct(inp.rate)} mortgage costs more than the Fund's share grows at ${fmtPlain.format(growth)}% a year, so money in the offset saves more than buying the share back early. You own the home outright ${other.months > best.months ? `${duration(other.months - best.months, 12)} sooner and ` : ""}${fmtDollars.format(other.total - best.total)} cheaper.`;
+  }
+
+  // The income-threshold repayment is the same event in both orders (it happens before either finishes),
+  // so describe it from the recommended one.
+  const f = best.forced;
+  let forcedHtml = "";
+  if (incomeOver && f) {
+    const whenTxt = fmtMonthYear(dateAfter(f.m, 12));
+    const bought = f.before - f.after;
+    forcedHtml = `
+      <div class="forced">
+        <span class="label">Required buy-back, ${whenTxt}</span>
+        <span class="big num">${bought > 0 ? `${fmtDollars.format(f.cost)} for ${fmtPlain.format(bought)}%` : "Nothing affordable"}</span>
+        <span class="per">${bought > 0
+          ? `Property valued at about ${fmtDollars.format(f.value)} by then. ${f.fromOffset > 0 ? `${fmtDollars.format(f.fromOffset)} from your offset` : "Nothing from your offset"}${f.borrowed > 0 ? ` and ${fmtDollars.format(f.borrowed)} of extra borrowing` : ""}, taking the loan to ${fmtDollars.format(f.balAfter)} (${((f.balAfter / f.value) * 100).toFixed(0)}% of the value). The Fund keeps ${fmtPlain.format(f.after)}%.`
+          : `Your loan would already be at ${(f.lvrBefore * 100).toFixed(0)}% of the value, so there's no room under a ${fmtPlain.format(o.lvrCap)}% cap for even a 5% step${o.useOffset ? " once your offset is counted" : ""}. The State Revenue Office assesses what your circumstances permit.`}</span>
+      </div>`;
+  } else if (incomeOver && !f && forceAt) {
+    forcedHtml = `<p class="hint">The Fund's share is already bought back by then under the recommended order.</p>`;
+  }
+
+  $("vhf-body").innerHTML = forcedHtml + `
+    <div class="end-date">
+      <span class="label">Buy back the full ${fmtPlain.format(sharePts)}% today</span>
+      <span class="big num">${fmtDollars.format(costNow)}</span>
+      <span class="per">Each 5% step costs about ${fmtDollars.format(step)} at a value of ${fmtDollars.format(value)}. Your own equity after the Fund's share: ${fmtDollars.format(yourEquity)}.</span>
+    </div>
+    <div class="compare">
+      <div class="col-head"></div>
+      <div class="col-head val label">Per year</div>
+      <div class="col-head val label">Rate</div>
+      <div class="row-head">Fund's share grows by</div>
+      <div class="val">${fmtDollars.format(holdCost)}</div>
+      <div class="val">${fmtPlain.format(growth)}%</div>
+      <div class="row-head">Same cash in offset saves</div>
+      <div class="val">${fmtDollars.format(offsetSaves)}</div>
+      <div class="val">${fmtPct(inp.rate * inp.offsetPct / 100)}</div>
+    </div>
+    <p class="verdict">${verdict}</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Order</th><th>Own outright</th><th>Interest</th><th>Buy-backs</th><th>Total</th></tr></thead>
+        <tbody>${row("Fund first", ff)}${row("Loan first", lf)}</tbody>
+      </table>
+    </div>
+    <details class="changes">
+      <summary>${bestName}: buy-back steps (${best.events.length})</summary>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>When</th><th>Payment</th><th>Fund's share after</th></tr></thead>
+          <tbody>${timeline || `<tr><td colspan="3">No buy-backs needed.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </details>
+    ${late(best) ? `<p class="hint warn">This plan finishes buying back the share after ${fmtDay(due)}, the loan term plus 60 days. The Fund must be repaid by then, so you'd need to buy back faster.</p>` : ""}
+    <p class="hint">Uses your repayment of ${fmtCents.format(r.total)} a ${r.unit} and offset growth of ${fmtDollars.format(inp.growth)} a month, with the property growing ${fmtPlain.format(growth)}% a year. Each buy-back is at least 5 points and $10,000, priced at the value on the day, and the State arranges the valuation. You must also repay if you sell${incomeOver ? "" : ", or if your income is over the threshold at two annual reviews in a row"}. The annual review asks whether it's still your principal residence, so check with the State Revenue Office before renting it out.</p>`;
+}
+
+/* ---------- Rental income panel ---------- */
+
+function renderRental(inp, r) {
+  const R = inp.rental;
+  $("rent-fields").hidden = !R.on;
+  $("rent-chip").hidden = !R.on || userEdited;
+  if (!R.on) { $("rent-body").innerHTML = ""; return; }
+  const x = r.rental;
+  if (!x) { $("rent-body").innerHTML = `<div class="muted-box">Enter a weekly rent to see the numbers.</div>`; return; }
+
+  const wk = (v) => fmtDollars.format(v / 52);
+  const yr = (v) => fmtDollars.format(v);
+  const repayYear = r.total * r.ppy;
+  const principal = Math.max(0, repayYear - x.interest);
+  // Cash in hand from the property before loan repayments, after tax
+  const cashBeforeLoan = x.gross - x.mgmt - x.letting - x.running - x.landTax + x.tax;
+  const outOfPocket = repayYear - cashBeforeLoan;            // total cash you put in each year
+  const covers = (cashBeforeLoan / repayYear) * 100;
+  // The real cost of holding the rental: everything except principal, which is loan paydown (saving).
+  // A lower interest rate lowers this, even though a fixed repayment then shifts more into principal.
+  const holdCost = x.interest - cashBeforeLoan;              // + costs you money, − earns money
+
+  const line = (label, v, cls = "") => `<tr class="${cls}"><td>${label}</td><td class="num">${yr(v)}</td><td class="num">${wk(v)}</td></tr>`;
+
+  // Effect on the projection
+  const pd = debtFree(r.plan), pn = debtFree(r.planNoRent);
+  const moved = pn.periods - pd.periods;
+  const effect = R.project
+    ? (moved > 0
+        ? `Adding the rental cash flow to your offset from ${fmtMonthYear(R.startDate)} brings your debt-free date forward ${duration(moved, r.ppy)}, to ${fmtMonthYear(dateAfter(pd.periods, r.ppy))}.`
+        : moved < 0
+          ? `The rental costs more than it earns after tax, which draws ${yr(-x.extraCash)} a year from your offset and pushes your debt-free date back ${duration(-moved, r.ppy)}.`
+          : `Renting doesn't change your debt-free date.`)
+    : `Not included in the projection. Tick the box above to add it.`;
+
+  $("rent-body").innerHTML = `
+    <div class="end-date">
+      <span class="label">${holdCost > 0 ? "Renting it out costs you" : "Renting it out earns you"}</span>
+      <span class="big num">${fmtDollars.format(Math.abs(holdCost) / 52)} a week</span>
+      <span class="per">After rent, costs, interest and tax, in the first year from ${fmtMonthYear(R.startDate)}. On top of that you repay ${fmtDollars.format(principal / 52)} a week of principal, which pays down your loan rather than costing you. In total you put in ${fmtDollars.format(outOfPocket / 52)} a week, and the rent covers ${Math.round(covers)}% of your ${fmtCents.format(r.total)} ${r.label.toLowerCase()} repayments.</span>
+    </div>
+    <div class="table-scroll">
+      <table class="pl-table">
+        <thead><tr><th>First year</th><th>Year</th><th>Week</th></tr></thead>
+        <tbody>
+          ${line(`Rent (${fmtPlain.format(52 - R.vacancy)} weeks let)`, x.gross)}
+          ${line("Management and letting fees", -(x.mgmt + x.letting))}
+          ${line("Rates, water, owners corp, insurance, repairs", -x.running)}
+          ${line(`Land tax (site value ${fmtDollars.format(R.siteValue)})`, -x.landTax)}
+          ${line("Loan interest (deductible)", -x.interest)}
+          ${line(x.profit >= 0 ? "Rental profit" : "Rental loss", x.profit, "total")}
+          ${R.deprec > 0 ? line("Depreciation (non-cash)", -R.deprec, "sub") : ""}
+          ${line(x.tax >= 0 ? `Tax refund at ${R.taxRate}%` : `Extra tax at ${R.taxRate}%`, x.tax)}
+          ${line(holdCost > 0 ? "Cost after tax" : "Earnings after tax", -holdCost, "total")}
+          ${line("Loan principal (pays down your loan)", -principal, "sub")}
+          ${line("Total you put in", -outOfPocket, "total")}
+          ${R.ownRent > 0 ? line("Your rent elsewhere (budget only)", -R.ownRent * 52, "sub") : ""}
+          ${R.ownRent > 0 ? line("Total housing outgoings", -(outOfPocket + R.ownRent * 52), "total") : ""}
+        </tbody>
+      </table>
+    </div>
+    <p class="verdict">${effect}</p>
+    <p class="hint">Rates, water, owners corp, insurance and repairs (from the yearly property costs) are costs you already pay while living there; renting makes them deductible. Interest is the estimated first-year amount after your offset. With a fixed repayment, a lower rate moves money from interest to principal: the cost falls, but the smaller tax refund means you put in slightly more cash. Only interest on money borrowed to buy the property is deductible. Land tax uses Victoria's 2026 general rates once the home is no longer your main residence.</p>
+    ${vhfSharePct() ? `<p class="hint warn">Homebuyer Fund: the scheme was for homes you live in, the annual review asks whether it's still your principal residence, and the State holds ${fmtPlain.format(vhfSharePct())}%. Check with the State Revenue Office before renting it out; you may need to buy the share back first.</p>` : ""}
+    <p class="hint">Capital gains: the ATO lets you keep treating a former home as your main residence for up to six years while it's rented, if you don't claim another. Check the details with your accountant.</p>`;
+}
+
+/* ---------- Monthly budget ---------- */
+
+function renderBudget(inp, r) {
+  const pay = optMoney("bud-pay");
+  const living = optMoney("bud-living");
+  const R = inp.rental;
+  const x = r.rental;                               // first-year rental figures (null if not renting)
+
+  if (!(pay > 0)) {
+    $("budget-body").innerHTML = `<div class="muted-box">Enter your monthly take-home pay to see what's left after your loan, property costs and living costs.</div>`;
+    return;
+  }
+
+  const m = (v) => v / 12;                          // yearly → monthly
+  const repay = (r.total * r.ppy) / 12;             // your repayment as a monthly amount
+  const propCosts = m(R.rates + R.water + R.oc + R.ins + R.maint);
+  const renting = R.on && x;
+
+  // Column values: living there now, and renting it out from the start date
+  const now = pay - repay - propCosts - living;
+  let rent = null;
+  if (renting) {
+    const rentIn = m(x.gross - x.mgmt - x.letting - x.landTax);   // rent after fees and land tax
+    const refund = m(x.tax);                                        // + refund, − extra tax
+    const own = (R.ownRent * 52) / 12;
+    rent = { rentIn, refund, own, left: now + rentIn + refund - own };
+  }
+
+  const cell = (v) => `<td class="num">${v === null ? "–" : fmtDollars.format(v)}</td>`;
+  const row = (label, a, b, cls = "") => `<tr class="${cls}"><td>${label}</td>${cell(a)}${renting ? cell(b) : ""}</tr>`;
+
+  // Compare with the offset growth you've entered (the "now" column is what funds it)
+  const growth = inp.growthOwn;                     // partner's share doesn't come from your pay
+  const spareNow = now - growth;
+  let compare;
+  if (now < 0) {
+    compare = `<p class="hint warn">You're ${fmtDollars.format(-now)} a month short before any offset savings.</p>`;
+  } else if (spareNow < -0.5) {
+    compare = `<p class="hint warn">Your offset savings of ${fmtDollars.format(growth)} a month are ${fmtDollars.format(-spareNow)} more than you have left.</p>`;
+  } else {
+    compare = `<p class="hint">After your offset savings of ${fmtDollars.format(growth)} a month, you have ${fmtDollars.format(spareNow)} a month unallocated.</p>`;
+  }
+  if (inp.partner > 0) compare += `<p class="hint">Your partner adds ${fmtDollars.format(inp.partner)} a month on top, from their own income.</p>`;
+
+  $("budget-body").innerHTML = `
+    <div class="end-date">
+      <span class="label">Left over each month${renting ? " now" : ""}</span>
+      <span class="big num">${fmtDollars.format(now)}</span>
+      ${renting ? `<span class="per">${fmtDollars.format(rent.left)} a month once renting from ${fmtMonthYear(R.startDate)}.</span>` : ""}
+    </div>
+    <div class="table-scroll">
+      <table class="budget-table">
+        <thead><tr><th>Per month</th><th>${renting ? "Living there" : "Amount"}</th>${renting ? `<th>Renting it out</th>` : ""}</tr></thead>
+        <tbody>
+          ${row("Take-home pay", pay, pay, "plus")}
+          ${row(`Loan repayments (${fmtCents.format(r.total)} a ${r.unit})`, -repay, -repay)}
+          ${row("Property costs", -propCosts, -propCosts)}
+          ${renting ? row("Rent after fees and land tax", null, rent.rentIn, "plus") : ""}
+          ${renting ? row(rent.refund >= 0 ? "Tax refund (averaged)" : "Extra tax (averaged)", null, rent.refund, rent.refund >= 0 ? "plus" : "") : ""}
+          ${renting && rent.own > 0 ? row("Your rent elsewhere", null, -rent.own) : ""}
+          ${living > 0 ? row("Other living costs", -living, -living) : ""}
+          ${row("Left over", now, renting ? rent.left : null, "total")}
+        </tbody>
+      </table>
+    </div>
+    ${compare}
+    ${now > 0 && Math.abs(spareNow) >= 1 ? `<div class="opt-actions"><button type="button" class="btn" id="use-leftover">Set offset growth to ${fmtDollars.format(Math.round(now))} a month</button><span class="hint">Sets your part of the offset growth to everything left over.</span></div>` : ""}
+    <p class="hint">${renting ? "The tax refund is averaged across the year; you'd normally get it at tax time, or sooner with a PAYG withholding variation. " : ""}Property costs come from the Property costs section.</p>`;
+}
+
+/* ---------- Update cycle ---------- */
+
+function update() {
+  const inp = readInputs();
+  const err = validate(inp);
+  $("error").hidden = !err;
+  $("error").textContent = err || "";
+  if (err) return;   // keep the last good results on screen while the user is mid-edit
+
+  const results = calculate(inp);
+  lastResults = { inp, results };
+  const sel = results.find((r) => r.key === selectedFreq);
+
+  vhfState = computeVHF(inp, sel);
+  $("growth-hint").textContent = inp.partner > 0
+    ? `${fmtDollars.format(inp.growth)} a month into the offset in total.`
+    : "What goes into the offset each month after spending. Use 0 for a steady balance.";
+  renderCards(inp, results);
+  renderNomHint(inp, sel);
+  $("term-hint").textContent = `${duration(inp.remainingMonths, 12)} left on the original schedule, ending ${fmtMonthYear(dateAfter(inp.remainingMonths, 12))}.`;
+  renderMethodNote(inp, results);
+  renderPlan(inp, sel);
+  renderOptimiser(inp, sel);
+  renderRateHistory(inp);
+  renderProperty(inp);
+  renderVHF(inp, sel);
+  renderRental(inp, sel);
+  renderBudget(inp, sel);
+  renderTable(results);
+  $("chart-freq").textContent = `${sel.label} repayments`;
+  renderChart(inp, sel);
+  save();
+}
+
+/* ---------- Persistence (this browser only; optional) ---------- */
+
+const FIELDS = ["balance", "rate", "startmonth", "startyear", "term", "offset", "offsetpct", "growth", "nominated", "nomfreq", "budget", "startrate", "v-purchase", "v-council", "v-bank", "v-agent", "vhf-share", "vhf-value", "vhf-growth", "vhf-due-month", "vhf-due-year", "vhf-lvr", "rent-month", "rent-year", "rent-weekly", "rent-vacancy", "rent-mgmt", "rent-letting", "rent-own", "rent-rates", "rent-water", "rent-oc", "rent-ins", "rent-maint", "rent-sv", "rent-taxrate", "rent-deprec", "bud-pay", "bud-living", "partner"];
+// Everything the page needs to restore itself
+function collectState() {
+  const data = {
+    method: document.querySelector('input[name="method"]:checked').value,
+    dtype: document.querySelector('input[name="dtype"]:checked').value,
+    vhfIncome: $("vhf-income").checked, vhfUseOffset: $("vhf-useoffset").checked,
+    rentOn: $("rent-on").checked, rentProject: $("rent-project").checked,
+  };
+  FIELDS.forEach((id) => (data[id] = $(id).value));
+  return data;
+}
+function applyState(data) {
+  if (!data || typeof data !== "object") return false;
+  FIELDS.forEach((id) => { if (typeof data[id] === "string") $(id).value = data[id]; });
+  const radio = (name, v) => { const el = document.querySelector(`input[name="${name}"][value="${v}"]`); if (el) el.checked = true; };
+  if (data.method) radio("method", data.method);
+  if (data.dtype) radio("dtype", data.dtype);
+  if (typeof data.vhfIncome === "boolean") $("vhf-income").checked = data.vhfIncome;
+  if (typeof data.vhfUseOffset === "boolean") $("vhf-useoffset").checked = data.vhfUseOffset;
+  if (typeof data.rentOn === "boolean") $("rent-on").checked = data.rentOn;
+  if (typeof data.rentProject === "boolean") $("rent-project").checked = data.rentProject;
+  // The repayment frequency drives the selected card
+  selectedFreq = $("nomfreq").value;
+  currentFreq = selectedFreq;
+  return true;
+}
+
+// Browser storage (this browser only) — a convenience, never required
+function save() {
+  if (!userEdited) return;   // don't store the example figures
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(collectState())); } catch (e) { /* storage unavailable */ }
+}
+function load() {
+  try { return applyState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "null")); } catch (e) { return false; }
+}
+
+/* ---------- Saved scenarios (this browser), share links and data files ---------- */
+
+const SCENARIO_KEY = "offset-mortgage-scenarios-v1";
+let scenarios = [];              // [{id, name, savedAt, data}], newest first
+let pendingDelete = null;        // id awaiting a second click to confirm
+
+function setStatus(msg, warn = false) {
+  $("save-status").textContent = msg;
+  $("save-status").classList.toggle("warn", warn);
+}
+
+function readScenarios() {
+  try { const v = JSON.parse(localStorage.getItem(SCENARIO_KEY) || "[]"); return Array.isArray(v) ? v : []; }
+  catch (e) { return []; }
+}
+function writeScenarios() {
+  try { localStorage.setItem(SCENARIO_KEY, JSON.stringify(scenarios)); return true; }
+  catch (e) { setStatus("This browser won't store scenarios (private browsing?). Use a share link or data file instead.", true); return false; }
+}
+
+function renderSaves() {
+  const list = $("save-list");
+  if (!scenarios.length) {
+    list.innerHTML = `<li><span class="when">No saved scenarios yet. Name your current figures and save them.</span></li>`;
+    return;
+  }
+  list.innerHTML = scenarios.map((sc) => {
+    const when = new Date(sc.savedAt).toLocaleString("en-AU", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return `<li>
+      <span class="name"></span>
+      <span class="when">${when}</span>
+      <button type="button" class="btn-ghost" data-load="${sc.id}">Load</button>
+      <button type="button" class="btn-ghost danger" data-del="${sc.id}">${pendingDelete === sc.id ? "Confirm delete" : "Delete"}</button>
+    </li>`;
+  }).join("");
+  // Names are user text: set them as text, not HTML
+  [...list.querySelectorAll(".name")].forEach((el, i) => (el.textContent = String(scenarios[i].name || "Untitled")));
+}
+
+function initSaves() {
+  scenarios = readScenarios();
+  renderSaves();
+}
+
+$("save-btn").addEventListener("click", () => {
+  const name = $("save-name").value.trim() || `Scenario ${new Date().toLocaleDateString("en-AU")}`;
+  // Saving under an existing name replaces that scenario
+  const existing = scenarios.find((sc) => String(sc.name).toLowerCase() === name.toLowerCase());
+  const entry = { id: existing ? existing.id : String(Date.now()), name, savedAt: new Date().toISOString(), data: collectState() };
+  scenarios = [entry, ...scenarios.filter((sc) => sc !== existing)];
+  if (writeScenarios()) {
+    setStatus(existing ? `Updated “${name}”.` : `Saved “${name}”.`);
+    $("save-name").value = "";
+  }
+  renderSaves();
+});
+
+$("save-list").addEventListener("click", (e) => {
+  const loadId = e.target.closest("[data-load]")?.dataset.load;
+  const delId = e.target.closest("[data-del]")?.dataset.del;
+  if (loadId) {
+    const sc = scenarios.find((x) => x.id === loadId);
+    if (sc && applyState(sc.data)) { markEdited(); update(); setStatus(`Loaded “${sc.name}”.`); }
+    return;
+  }
+  if (delId) {
+    if (pendingDelete !== delId) {        // first click arms, second click deletes
+      pendingDelete = delId; renderSaves();
+      setTimeout(() => { if (pendingDelete === delId) { pendingDelete = null; renderSaves(); } }, 4000);
+      return;
+    }
+    pendingDelete = null;
+    const sc = scenarios.find((x) => x.id === delId);
+    scenarios = scenarios.filter((x) => x.id !== delId);
+    writeScenarios();
+    renderSaves();
+    setStatus(`Deleted “${sc ? sc.name : "scenario"}”.`);
+  }
+});
+
+// Share link: the figures travel in the URL fragment (#plan=…), base64url-encoded JSON
+function encodePlan(data) {
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let bin = ""; bytes.forEach((b) => (bin += String.fromCharCode(b)));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function decodePlan(str) {
+  const b64 = str.replace(/-/g, "+").replace(/_/g, "/");
+  const bin = atob(b64 + "===".slice((b64.length + 3) % 4));
+  return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
+}
+
+$("share-btn").addEventListener("click", async () => {
+  const url = `${location.origin}${location.pathname}#plan=${encodePlan(collectState())}`;
+  const box = $("share-url");
+  box.value = url; box.hidden = false;
+  try {
+    await navigator.clipboard.writeText(url);
+    setStatus("Share link copied. Anyone who opens it sees these figures.");
+  } catch (e) {
+    box.focus(); box.select();
+    setStatus("Copy the link below to share these figures.");
+  }
+});
+
+// Data file: download…
+$("file-save").addEventListener("click", () => {
+  const body = JSON.stringify({ app: "offset-mortgage-calculator", version: 1, savedAt: new Date().toISOString(), data: collectState() }, null, 2);
+  const url = URL.createObjectURL(new Blob([body], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "mortgage-plan.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setStatus("Data file downloaded.");
+});
+// …and open
+$("file-open-label").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file-open").click(); } });
+$("file-open").addEventListener("change", () => {
+  const file = $("file-open").files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const obj = JSON.parse(reader.result);
+      const data = obj && obj.data ? obj.data : obj;
+      if (!applyState(data) || typeof data.balance !== "string") throw new Error("not a plan");
+      markEdited(); update();
+      setStatus(`Loaded ${file.name}.`);
+    } catch (e) {
+      setStatus("That file isn't a data file from this calculator.", true);
+    }
+    $("file-open").value = "";
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- Events ---------- */
+
+let userEdited = false;
+function markEdited() {
+  if (!userEdited) { userEdited = true; $("example-chip").hidden = true; }
+}
+
+$("loan-form").addEventListener("input", (e) => {
+  markEdited();
+  if (e.target.id === "nomfreq") setFrequency(e.target.value, false);
+  update();
+});
+
+// Change how often you pay. Your repayment is converted so the yearly total stays the same
+// (e.g. $2,000/fortnight → $1,000/week), which keeps the comparison like-for-like.
+let currentFreq = null;
+function setFrequency(key, syncSelect = true) {
+  const from = FREQS.find((f) => f.key === currentFreq);
+  const to = FREQS.find((f) => f.key === key);
+  const amt = parseMoney($("nominated").value);
+  if (from && to && from !== to && amt > 0) {
+    $("nominated").value = new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      .format(Math.round(((amt * from.ppy) / to.ppy) * 100) / 100);
+  }
+  if (syncSelect) $("nomfreq").value = key;
+  currentFreq = key;
+  selectedFreq = key;
+}
+$("loan-form").addEventListener("submit", (e) => e.preventDefault());
+
+// Tidy money fields with thousands separators when leaving the field
+["balance", "offset", "growth", "nominated", "budget", "v-purchase", "v-council", "v-bank", "v-agent", "vhf-value", "rent-weekly", "rent-own", "rent-rates", "rent-water", "rent-oc", "rent-ins", "rent-maint", "rent-sv", "rent-deprec", "bud-pay", "bud-living", "partner"].forEach((id) => {
+  $(id).addEventListener("blur", () => {
+    const v = parseMoney($(id).value);
+    if (Number.isFinite(v)) $(id).value = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 2 }).format(v);
+  });
+});
+
+$("freq-cards").addEventListener("click", (e) => {
+  const card = e.target.closest(".freq-card");
+  if (!card) return;
+  markEdited();
+  setFrequency(card.dataset.freq);
+  update();
+});
+
+// Inputs that sit outside the loan form (optimiser budget, history and valuation fields)
+$("budget").addEventListener("input", () => { markEdited(); update(); });
+document.querySelectorAll(".ext-input").forEach((el) => el.addEventListener("input", () => { markEdited(); update(); }));
+document.querySelectorAll('input[name="dtype"], input[type="checkbox"].ext-input, select.ext-input').forEach((el) => el.addEventListener("change", () => { markEdited(); update(); }));
+
+// Put everything left over in the budget into offset growth
+$("budget-body").addEventListener("click", (e) => {
+  const btn = e.target.closest("#use-leftover");
+  if (!btn) return;
+  const v = parseMoney(btn.textContent.replace(/[^0-9.,]/g, ""));
+  if (Number.isFinite(v)) { $("growth").value = new Intl.NumberFormat("en-AU").format(v); markEdited(); update(); }
+});
+
+// Copy the estimated current rate into the calculator
+$("rates-body").addEventListener("click", (e) => {
+  if (!e.target.closest("#use-est-rate")) return;
+  const start = new Date(parseNum($("startyear").value), parseInt($("startmonth").value, 10), 1);
+  const est = RBA_CHANGES[RBA_CHANGES.length - 1].rate + parseNum($("startrate").value) - cashRateOn(start);
+  $("rate").value = est.toFixed(2);
+  markEdited();
+  update();
+});
+
+// Apply the recommended split to the repayment and offset growth fields
+$("opt-body").addEventListener("click", (e) => {
+  if (!e.target.closest("#apply-split") || !bestSplit) return;
+  const f = FREQS.find((x) => x.key === selectedFreq);
+  const money = (v) => new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  $("nominated").value = money(bestSplit.pay);
+  $("growth").value = money(Math.round(((bestSplit.dep * f.ppy) / 12) * 100) / 100);
+  markEdited();
+  update();
+  $("offset-h").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+$("chart").addEventListener("pointermove", onChartMove);
+$("chart").addEventListener("pointerleave", onChartLeave);
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    if (lastResults) { renderChart(lastResults.inp, lastResults.results.find((r) => r.key === selectedFreq)); renderRateHistory(lastResults.inp); }
+  }, 120);
+});
+
+/* ---------- Boot ---------- */
+let fromLink = false;
+if (location.hash.startsWith("#plan=")) {
+  try { fromLink = applyState(decodePlan(location.hash.slice(6))); } catch (e) { fromLink = false; }
+}
+if (fromLink || load()) { userEdited = true; $("example-chip").hidden = true; }
+// The chosen repayment frequency drives which card is selected
+selectedFreq = $("nomfreq").value;
+currentFreq = selectedFreq;
+update();
+initSaves();
+if (fromLink) {
+  $("saves").open = true;
+  setStatus("Loaded figures from a share link. Save them in this browser to keep them.");
+}
+</script>
+</body>
+</html>
